@@ -1,0 +1,10 @@
+# Pliki prywatnych danych lokalizacyjnych Google Timeline
+Timeline.json
+*.json
+!package.json
+
+# Pliki tymczasowe i systemowe
+.DS_Store
+Thumbs.db
+*.log
+
