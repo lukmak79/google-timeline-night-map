@@ -1,0 +1,3443 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Timeline - Animacja Podróży z Przyczepą 🚗⛺</title>
+  
+  <!-- Leaflet CSS & JS (przypięta wersja z CDN cdnjs.cloudflare.com) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  
+  <!-- html2canvas do lokalnego eksportu PNG mapy w przeglądarce (przypięta wersja z cdnjs.cloudflare.com) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    :root {
+      --bg-primary: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-card: #f1f5f9;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #cbd5e1;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-purple: #8b5cf6;
+      --accent-red: #ef4444;
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --radius: 10px;
+    }
+
+    [data-theme="dark"] {
+      --bg-primary: #0f172a;
+      --bg-surface: #1e293b;
+      --bg-card: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #475569;
+      --primary: #3b82f6;
+      --primary-hover: #60a5fa;
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg-primary: #0f172a;
+        --bg-surface: #1e293b;
+        --bg-card: #334155;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --border-color: #475569;
+        --primary: #3b82f6;
+        --primary-hover: #60a5fa;
+        --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    /* Pasek powiadomień o błędach (domyślnie ukryty) */
+    #error-banner {
+      display: none;
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 10px 20px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      border-bottom: 1px solid #f87171;
+      position: relative;
+      z-index: 3000;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    [data-theme="dark"] #error-banner {
+      background: #7f1d1d;
+      color: #fecaca;
+      border-bottom-color: #b91c1c;
+    }
+
+    /* Baner prywatności i nagłówek */
+    header {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 1000;
+    }
+
+    .title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .title-group h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .privacy-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background-color: rgba(16, 185, 129, 0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      width: fit-content;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Pasek parametrów i filtrów */
+    .controls-bar {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.85rem;
+      z-index: 999;
+    }
+
+    .control-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .control-item label {
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    input[type="date"],
+    input[type="time"],
+    select {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    input[type="range"] {
+      cursor: pointer;
+      accent-color: var(--primary);
+    }
+
+    input[type="checkbox"] {
+      cursor: pointer;
+      width: 15px;
+      height: 15px;
+      accent-color: var(--primary);
+    }
+
+    .btn {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: var(--border-color);
+    }
+
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .dropdown-content {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      margin-top: 4px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+      min-width: 170px;
+      z-index: 1001;
+      overflow: hidden;
+    }
+
+    .dropdown-content button {
+      width: 100%;
+      text-align: left;
+      padding: 8px 14px;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: block;
+    }
+
+    .dropdown-content button:hover {
+      background: var(--bg-card);
+    }
+
+    .dropdown.show .dropdown-content {
+      display: block;
+    }
+
+    /* Główny obszar roboczy: Mapa + Panel */
+    .app-main {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    #map-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    #map {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      background: #1e293b;
+    }
+
+    /* Pływająca legenda mapy */
+    .map-legend {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.76rem;
+      box-shadow: var(--shadow);
+      z-index: 950;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      backdrop-filter: blur(8px);
+      background-color: rgba(255, 255, 255, 0.9);
+    }
+
+    [data-theme="dark"] .map-legend {
+      background-color: rgba(30, 41, 59, 0.9);
+    }
+
+    .legend-title {
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-size: 0.68rem;
+    }
+
+    .legend-gradient-bar {
+      width: 130px;
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(to right, hsl(240, 90%, 50%), hsl(160, 90%, 45%), hsl(60, 95%, 45%), hsl(0, 90%, 50%));
+    }
+
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-main);
+    }
+
+    .legend-dot-single {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #2563eb;
+      border: 1px solid #fff;
+    }
+
+    .legend-dot-cluster {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #f59e0b;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #fff;
+    }
+
+    /* Pasek osi czasu na dole mapy */
+    .timeline-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(92%, 840px);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow);
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      z-index: 950;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .timeline-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .timeline-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .timeline-slider {
+      flex: 1;
+      width: 100%;
+    }
+
+    .current-date-badge {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--primary);
+      min-width: 110px;
+      text-align: center;
+    }
+
+    .current-status-pill {
+      font-size: 0.8rem;
+      padding: 3px 10px;
+      border-radius: 4px;
+      background: var(--bg-card);
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 340px;
+    }
+
+    /* Prawy panel boczny */
+    .sidebar {
+      width: 390px;
+      min-width: 320px;
+      background: var(--bg-surface);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      z-index: 998;
+    }
+
+    .sidebar-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-card);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      background: var(--bg-surface);
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Statystyki */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .stat-card.full-width {
+      grid-column: span 2;
+    }
+
+    .stat-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 2px;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .stat-sub {
+      font-size: 0.78rem;
+      color: var(--text-main);
+      margin-top: 4px;
+    }
+
+    /* Lista dób */
+    .list-filter-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .filter-btn {
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    .filter-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .days-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .days-table th {
+      text-align: left;
+      padding: 6px 8px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      background: var(--bg-surface);
+      z-index: 2;
+    }
+
+    .days-table tr {
+      cursor: pointer;
+      border-bottom: 1px solid var(--border-color);
+      transition: background 0.1s;
+    }
+
+    .days-table tr:hover {
+      background: var(--bg-card);
+    }
+
+    .days-table tr.active-row {
+      background: rgba(37, 99, 235, 0.15);
+      border-left: 3px solid var(--primary);
+    }
+
+    .days-table td {
+      padding: 7px 8px;
+    }
+
+    /* Styl kart miejscówek i kempingów */
+    .campsites-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .campsite-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .campsite-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      transform: translateY(-1px);
+    }
+
+    .campsite-card.active-card {
+      border-color: var(--primary);
+      background: rgba(37, 99, 235, 0.08);
+      border-left: 3px solid var(--primary);
+    }
+
+    .campsite-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .campsite-title {
+      font-weight: 700;
+      font-size: 0.88rem;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      word-break: break-word;
+    }
+
+    .campsite-badge {
+      background: rgba(37, 99, 235, 0.12);
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 0.72rem;
+      padding: 2px 7px;
+      border-radius: 12px;
+      white-space: nowrap;
+    }
+
+    .campsite-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-edit-name {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 2px 4px;
+      border-radius: 4px;
+      opacity: 0.6;
+      transition: opacity 0.15s;
+    }
+
+    .btn-edit-name:hover {
+      opacity: 1;
+      background: var(--bg-card);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    .badge-visit { background: #dcfce7; color: #166534; }
+    .badge-interp { background: #e0f2fe; color: #075985; }
+    .badge-continuity { background: #ede9fe; color: #5b21b6; }
+    .badge-near { background: #fef3c7; color: #92400e; }
+    .badge-none { background: #fee2e2; color: #991b1b; }
+    .badge-future { background: #e2e8f0; color: #64748b; }
+
+    [data-theme="dark"] .badge-visit { background: #14532d; color: #bbf7d0; }
+    [data-theme="dark"] .badge-interp { background: #0c4a6e; color: #bae6fd; }
+    [data-theme="dark"] .badge-continuity { background: #4c1d95; color: #ddd6fe; }
+    [data-theme="dark"] .badge-near { background: #78350f; color: #fde68a; }
+    [data-theme="dark"] .badge-none { background: #7f1d1d; color: #fecaca; }
+    [data-theme="dark"] .badge-future { background: #334155; color: #94a3b8; }
+
+    /* Modal / Drag & drop overlay */
+    .drop-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      color: #ffffff;
+      padding: 20px;
+      text-align: center;
+    }
+
+    /* Modale dialogowe (Instrukcja, Powitanie CampMedia) */
+    .app-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(5px);
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      animation: modalFadeIn 0.25s ease-out;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .app-modal-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 28px;
+      position: relative;
+      color: var(--text-main);
+    }
+
+    .modal-close-btn {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      border: none;
+      background: var(--bg-card);
+      color: var(--text-muted);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: all 0.2s;
+    }
+
+    .modal-close-btn:hover {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+
+    .guide-step {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .step-num {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .drop-box {
+      border: 3px dashed #60a5fa;
+      border-radius: 16px;
+      padding: 40px;
+      background: rgba(30, 41, 59, 0.95);
+      max-width: 520px;
+      width: 100%;
+    }
+
+    .drop-box h2 {
+      font-size: 1.4rem;
+      margin-bottom: 10px;
+    }
+
+    .drop-box p {
+      font-size: 0.9rem;
+      color: #cbd5e1;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    /* Pasek postępu wczytywania */
+    #progress-container {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 2001;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .progress-bar-bg {
+      background: var(--bg-card);
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .progress-bar-fill {
+      background: var(--primary);
+      height: 100%;
+      width: 0%;
+      transition: width 0.15s;
+    }
+
+    /* Markery Leaflet */
+    .custom-cluster-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      color: #ffffff;
+      font-weight: 700;
+      box-shadow: 0 0 8px rgba(0,0,0,0.5);
+      border: 2px solid #ffffff;
+      transition: transform 0.15s ease;
+    }
+
+    .custom-cluster-icon:hover {
+      transform: scale(1.2);
+    }
+
+    .pulse-marker {
+      box-shadow: 0 0 0 0 rgba(37, 99, 235, 1);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.8);
+      }
+      70% {
+        box-shadow: 0 0 0 16px rgba(37, 99, 235, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+      }
+    }
+
+    /* Styl animowanego zestawu: Auto + Przyczepa kempingowa */
+    .caravan-div-icon {
+      background: transparent !important;
+      border: none !important;
+    }
+    .caravan-vehicle-container {
+      position: relative;
+      width: 68px;
+      height: 28px;
+      pointer-events: none;
+    }
+    .caravan-sprite {
+      width: 68px;
+      height: 28px;
+      transform-origin: 34px 14px;
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
+      transition: transform 0.08s linear;
+    }
+    .caravan-popup-pill {
+      position: absolute;
+      bottom: 34px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.92);
+      color: #ffffff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      pointer-events: none;
+      z-index: 2500;
+    }
+
+    .mobile-nav-bar {
+      display: none;
+    }
+    .mobile-filter-toggle-btn {
+      display: none !important;
+    }
+    .mobile-filters-header {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      header {
+        padding: 8px 12px;
+        gap: 8px;
+      }
+      .title-group h1 {
+        font-size: 0.98rem;
+        gap: 6px;
+      }
+      .title-group h1 svg {
+        width: 18px;
+        height: 18px;
+      }
+      .privacy-badge {
+        display: none !important;
+      }
+      .header-actions {
+        gap: 6px;
+      }
+      .header-actions .btn {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+      }
+      .hide-mobile {
+        display: none !important;
+      }
+
+      .mobile-filter-toggle-btn {
+        display: inline-flex !important;
+      }
+
+      .mobile-filters-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 4px;
+      }
+
+      /* Rozwijane filtry na telefonie */
+      .controls-bar {
+        display: none;
+        position: absolute;
+        top: 50px;
+        left: 0;
+        right: 0;
+        max-height: calc(100dvh - 105px);
+        overflow-y: auto;
+        background: var(--bg-surface);
+        z-index: 1050;
+        padding: 14px 16px;
+        box-shadow: 0 12px 28px rgba(0,0,0,0.3);
+        border-bottom: 2px solid var(--primary);
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .controls-bar.show-mobile {
+        display: flex;
+      }
+      .controls-bar .control-item {
+        justify-content: space-between;
+        width: 100%;
+      }
+      .controls-bar .control-item input[type="date"],
+      .controls-bar .control-item input[type="time"],
+      .controls-bar .control-item select {
+        flex: 1;
+        max-width: 170px;
+      }
+      .controls-bar > div:last-child {
+        margin-left: 0 !important;
+        display: flex;
+        gap: 8px;
+        width: 100%;
+        margin-top: 6px;
+      }
+      .controls-bar > div:last-child button,
+      .controls-bar > div:last-child .dropdown {
+        flex: 1;
+      }
+      .controls-bar > div:last-child .dropdown button {
+        width: 100%;
+        justify-content: center;
+      }
+
+      /* Główny obszar */
+      .app-main {
+        flex: 1;
+        min-height: 0;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Przełączanie widoków: Domyślnie mapa na pełen ekran, panele boczne po wybraniu z dolnego menu */
+      body[data-mobile-view="map"] #map-wrapper {
+        display: flex !important;
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+      }
+      body[data-mobile-view="map"] .sidebar {
+        display: none !important;
+      }
+
+      body:not([data-mobile-view="map"]) #map-wrapper {
+        display: none !important;
+      }
+      body:not([data-mobile-view="map"]) .sidebar {
+        display: flex !important;
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        border-left: none;
+        border-top: none;
+      }
+
+      /* Dolny pasek nawigacji na telefonie */
+      .mobile-nav-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        height: 52px;
+        background: var(--bg-surface);
+        border-top: 1px solid var(--border-color);
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.06);
+        z-index: 1000;
+        flex-shrink: 0;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+      }
+      .mobile-nav-btn {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+        position: relative;
+        padding: 6px 0;
+        gap: 2px;
+        text-decoration: none;
+      }
+      .mobile-nav-btn.active {
+        color: var(--primary);
+        background: rgba(37, 99, 235, 0.08);
+      }
+      .mobile-nav-icon {
+        font-size: 1.15rem;
+        line-height: 1;
+      }
+      .mobile-nav-badge {
+        position: absolute;
+        top: 3px;
+        right: calc(50% - 20px);
+        background: var(--primary);
+        color: #fff;
+        font-size: 0.62rem;
+        font-weight: 700;
+        border-radius: 9999px;
+        padding: 1px 5px;
+        min-width: 14px;
+        text-align: center;
+        line-height: 1.2;
+      }
+
+      /* Oś czasu na dole mapy */
+      .timeline-bar {
+        width: 95%;
+        bottom: 10px;
+        padding: 6px 8px;
+        gap: 6px;
+      }
+      .timeline-row {
+        gap: 6px;
+      }
+      .current-date-badge {
+        min-width: 75px;
+        font-size: 0.8rem;
+      }
+      .current-status-pill {
+        max-width: 100px;
+        font-size: 0.7rem;
+        padding: 2px 5px;
+      }
+      .timeline-controls button {
+        padding: 3px 6px !important;
+      }
+
+      /* Legenda na telefonie */
+      .map-legend {
+        top: 8px;
+        right: 8px;
+        padding: 6px 8px;
+        font-size: 0.68rem;
+        max-width: 135px;
+      }
+      .legend-gradient-bar {
+        width: 95px;
+      }
+
+      /* Modale na telefonie */
+      .app-modal-card {
+        padding: 18px 16px;
+        border-radius: 12px;
+        max-height: 85vh;
+      }
+      .app-modal-backdrop {
+        padding: 12px;
+      }
+    }
+
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .sidebar {
+        width: 320px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Modal 1: Powitalne okno CampMedia v1.0 (przy starcie) -->
+  <div id="modal-welcome" class="app-modal-backdrop">
+    <div class="app-modal-card" style="text-align: center; max-width: 500px;">
+      <button class="modal-close-btn" onclick="closeModal('modal-welcome')">✕</button>
+      
+      <div style="display:inline-flex; align-items:center; justify-content:center; width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, #2563eb, #7c3aed); color:#fff; margin-bottom:16px; box-shadow:0 10px 20px -5px rgba(37,99,235,0.4);">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+      </div>
+
+      <div style="font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#2563eb; margin-bottom:4px;">
+        Wizualizator Historii Lokalizacji
+      </div>
+      <h2 style="font-size:1.6rem; font-weight:800; margin-bottom:6px; color:var(--text-main);">
+        Google Timeline - Nocne Punkty
+      </h2>
+      <div style="display:inline-block; font-size:0.8rem; font-weight:700; padding:3px 10px; border-radius:20px; background:rgba(37,99,235,0.1); color:#2563eb; margin-bottom:18px;">
+        Wersja v1.0
+      </div>
+
+      <div style="background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border-color); text-align:left; margin-bottom:18px; font-size:0.88rem; line-height:1.5;">
+        <div style="display:flex; align-items:center; gap:8px; font-weight:700; color:var(--text-main); margin-bottom:6px;">
+          <span>Autorem aplikacji jest</span>
+          <span style="color:#2563eb; font-size:1.05rem;">CampMedia</span>
+        </div>
+        <p style="color:var(--text-muted); margin-bottom:12px;">
+          Narzędzie stworzone z myślą o podróżnikach, kamperowiczach i odkrywcach. Pozwala zamienić surowy plik z telefonu w piękną, chronologiczną mapę całorocznych noclegów i baz wypadowych.
+        </p>
+
+        <div style="border-top:1px dashed var(--border-color); padding-top:10px; margin-top:8px;">
+          <div style="font-weight:700; color:var(--text-main); font-size:0.82rem; margin-bottom:4px; display:flex; align-items:center; gap:5px;">
+            <span>🧭</span> Jak aplikacja buduje mapę?
+          </div>
+          <ul style="margin:0; padding-left:18px; color:var(--text-muted); font-size:0.8rem; line-height:1.45;">
+            <li><b>Punkt nocny (01:00):</b> Dla każdej doby ustala Twoją pozycję o wybranej godzinie nocnej.</li>
+            <li><b>Priorytet danych:</b> 1) Oficjalna wizyta (hotel, kemping) &rarr; 2) Rzeczywisty punkt GPS z telefonu &rarr; 3) Reguła ciągłości (gdy telefon był uśpiony nocą).</li>
+            <li><b>Grupowanie baz:</b> Kolejne noce w promieniu do 350 m łączy w jeden punkt z licznikiem nocy.</li>
+          </ul>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#16a34a; font-weight:600; margin-top:12px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          100% Prywatności: Wszystkie dane są przetwarzane lokalnie w przeglądarce.
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; justify-content:center;">
+        <button class="btn" style="flex:1; padding:12px; font-weight:700;" onclick="closeModal('modal-welcome'); document.getElementById('file-input').click();">
+          Wgraj Timeline.json
+        </button>
+        <button class="btn btn-secondary" style="flex:1; padding:12px;" onclick="closeModal('modal-welcome'); openModal('modal-guide');">
+          Jak pobrać plik?
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Instrukcja krok po kroku jak pobrać Timeline.json z telefonu -->
+  <div id="modal-guide" class="app-modal-backdrop">
+    <div class="app-modal-card">
+      <button class="modal-close-btn" onclick="closeModal('modal-guide')">✕</button>
+
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <span style="font-size:1.8rem;">📱</span>
+        <div>
+          <h2 style="font-size:1.35rem; font-weight:700; margin:0;">Jak pobrać Timeline.json z telefonu?</h2>
+          <span style="font-size:0.8rem; color:var(--text-muted);">Nowy format osi czasu Google (przechowywany bezpośrednio na urządzeniu)</span>
+        </div>
+      </div>
+
+      <div style="background:rgba(37,99,235,0.08); border-left:4px solid #2563eb; padding:10px 14px; border-radius:4px; font-size:0.85rem; line-height:1.45; margin-bottom:20px; color:var(--text-main);">
+        💡 <b>Ważne:</b> Od 2024 roku Google przechowuje historię lokalizacji <b>wyłącznie na Twoim telefonie</b> (nie w chmurze Google). Dlatego plik eksportuje się bezpośrednio z aplikacji Mapy Google na smartfonie.
+      </div>
+
+      <div class="guide-step">
+        <div class="step-num">1</div>
+        <div>
+          <strong style="color:var(--text-main);">Otwórz Mapy Google na telefonie</strong>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-top:2px;">
+            Dotknij swojego zdjęcia profilowego / inicjału w prawym górnym rogu ekranu i wybierz z menu <b>„Twoja oś czasu”</b> (Timeline).
+          </p>
+        </div>
+      </div>
+
+      <div class="guide-step">
+        <div class="step-num">2</div>
+        <div>
+          <strong style="color:var(--text-main);">Wejdź w Ustawienia osi czasu</strong>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-top:2px;">
+            W widoku osi czasu dotknij <b>trzech kropek (⋮)</b> w prawym górnym rogu ekranu i wybierz <b>„Ustawienia i prywatność”</b>.
+          </p>
+        </div>
+      </div>
+
+      <div class="guide-step">
+        <div class="step-num">3</div>
+        <div>
+          <strong style="color:var(--text-main);">Eksportuj dane osi czasu</strong>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-top:2px;">
+            Przewiń w dół do sekcji <i>„Ustawienia lokalizacji”</i> i kliknij <b>„Eksportuj dane z Osi czasu”</b> (lub <i>Kopia zapasowa osi czasu</i>).
+          </p>
+        </div>
+      </div>
+
+      <div class="guide-step">
+        <div class="step-num">4</div>
+        <div>
+          <strong style="color:var(--text-main);">Zapisz i prześlij plik</strong>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-top:2px;">
+            Telefon wygeneruje plik o nazwie <b><code>Timeline.json</code></b>. Zapisz go na Dysku Google, wyślij e-mailem na komputer lub podłącz kabel USB i przeciągnij go do tej aplikacji.
+          </p>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border-color); padding-top:14px; margin-top:10px; font-size:0.82rem; color:var(--text-muted);">
+        <b>Stary format Google Takeout?</b> Jeśli pobierasz archiwum ze strony <i>takeout.google.com</i>, aplikacja obsługuje również archiwalne pliki <code>Records.json</code> oraz miesięczne pliki z folderu <i>Semantic Location History</i>.
+      </div>
+
+      <div style="margin-top:20px; display:flex; justify-content:flex-end;">
+        <button class="btn" onclick="closeModal('modal-guide')">Rozumiem, zamknij</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pasek powiadomień o błędach (domyślnie ukryty) -->
+  <div id="error-banner" style="display:none;">
+    <span id="error-banner-text">Wystąpił błąd</span>
+    <button onclick="document.getElementById('error-banner').style.display='none'" style="border:none; background:transparent; font-size:1.1rem; cursor:pointer; color:inherit; padding-left:15px;">✕</button>
+  </div>
+
+  <!-- Pasek postępu dla wczytywania i parsowania -->
+  <div id="progress-container">
+    <div style="display:flex; justify-content:space-between; font-size:0.85rem; font-weight:600;">
+      <span id="progress-text">Przetwarzanie pliku...</span>
+      <span id="progress-percent">0%</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div id="progress-bar" class="progress-bar-fill"></div>
+    </div>
+  </div>
+
+  <!-- Nagłówek i twardy wymóg prywatności -->
+  <header>
+    <div class="title-group">
+      <h1>
+        <span style="font-size:1.3rem;">🚗⛺</span>
+        Google Timeline - Animacja Podróży z Przyczepą
+      </h1>
+      <span class="privacy-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Tryb z animowanym zestawem podróżnym. Prywatność: 100% lokalnie.
+      </span>
+    </div>
+
+    <div class="header-actions">
+      <!-- Przełącznik powrotu do wersji standardowej -->
+      <a href="index.html" class="btn btn-secondary" style="font-size:0.8rem; text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Przejdź do wersji klasycznej">
+        ↩ <span class="hide-mobile">Wersja klasyczna</span>
+      </a>
+
+      <!-- Przycisk rozwijania filtrów na mobile -->
+      <button class="btn btn-secondary mobile-filter-toggle-btn" id="btn-toggle-filters" onclick="toggleMobileFilters()" title="Ustawienia i filtry mapy">
+        ⚙️ <span class="hide-mobile">Filtry</span>
+      </button>
+
+      <button class="btn btn-secondary" id="btn-open-guide" title="Instrukcja pobierania pliku Timeline.json z telefonu">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        <span class="hide-mobile">Jak pobrać plik?</span>
+      </button>
+
+      <button class="btn btn-secondary" id="btn-open-about" title="O aplikacji CampMedia">
+        ℹ️ <span class="hide-mobile">O aplikacji</span>
+      </button>
+
+      <input type="file" id="file-input" multiple accept=".json" style="display:none;">
+      <button class="btn" id="btn-upload" onclick="document.getElementById('file-input').click()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        <span>Wgraj <span class="hide-mobile">plik(i) Timeline.json</span></span>
+      </button>
+
+      <button class="btn btn-secondary" id="theme-toggle" title="Zmień motyw">
+        🌓
+      </button>
+    </div>
+  </header>
+
+  <!-- Pasek parametrów: data, godzina, tolerancja, strefa, podkład mapy i reguła ciągłości -->
+  <div class="controls-bar">
+    <div class="mobile-filters-header">
+      <span style="font-weight:700; font-size:0.95rem;">⚙️ Parametry i filtry</span>
+      <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="toggleMobileFilters()">✕ Zamknij</button>
+    </div>
+    <div class="control-item">
+      <label for="date-start">Zakres od:</label>
+      <input type="date" id="date-start" value="2026-01-01">
+    </div>
+    <div class="control-item">
+      <label for="date-end">do:</label>
+      <input type="date" id="date-end" value="2026-12-31">
+    </div>
+    <div class="control-item">
+      <label for="target-time">Godzina nocna:</label>
+      <input type="time" id="target-time" value="01:00">
+    </div>
+    <div class="control-item">
+      <label for="tolerance-slider" title="Maksymalny rozrzut czasu dla najbliższego punktu">Tolerancja: <span id="tolerance-val">60</span> min</label>
+      <input type="range" id="tolerance-slider" min="15" max="180" step="5" value="60">
+    </div>
+
+    <!-- Suwak promienia grupowania pobytu -->
+    <div class="control-item">
+      <label for="cluster-radius-slider" title="Maksymalny promień łączenia kolejnych nocy w jedno miejsce (przydatne na dużych kempingach i w kurortach)">Grupowanie: <span id="cluster-radius-val">350</span> m</label>
+      <input type="range" id="cluster-radius-slider" min="100" max="1000" step="25" value="350">
+    </div>
+
+    <!-- Reguła 3: Nocna ciągłość -->
+    <div class="control-item" style="cursor:pointer; background:rgba(139, 92, 246, 0.1); padding:4px 8px; border-radius:6px; border:1px solid rgba(139, 92, 246, 0.25);" title="Uzupełnia noce, w których telefon był uśpiony: jeśli ostatni punkt wieczorem i pierwszy rano to to samo miejsce (promień 250 m)">
+      <input type="checkbox" id="chk-continuity" checked style="cursor:pointer;">
+      <label for="chk-continuity" style="cursor:pointer; color:var(--text-main); font-weight:600;">Reguła nocnej ciągłości (wieczór - rano)</label>
+    </div>
+
+    <div class="control-item">
+      <label for="tz-select">Strefa:</label>
+      <select id="tz-select">
+        <option value="Europe/Warsaw" selected>Europe/Warsaw (PL)</option>
+        <option value="UTC">UTC</option>
+        <option value="Europe/London">Europe/London</option>
+        <option value="Europe/Berlin">Europe/Berlin</option>
+        <option value="America/New_York">America/New_York</option>
+        <option value="Asia/Tokyo">Asia/Tokyo</option>
+        <option value="SYSTEM">Systemowa strefa przeglądarki</option>
+      </select>
+    </div>
+
+    <div class="control-item">
+      <label for="tile-select">Mapa:</label>
+      <select id="tile-select" title="Wybór darmowego podkładu mapy bez klucza API">
+        <option value="esri_street" selected>Esri Ulice (bez API key)</option>
+        <option value="esri_topo">Esri Topo</option>
+        <option value="esri_dark">Esri Ciemna (Dark Gray)</option>
+        <option value="esri_gray">Esri Jasna Szara</option>
+        <option value="osm_hot">OSM Humanitarian</option>
+      </select>
+    </div>
+
+    <div style="margin-left: auto; display:flex; gap:8px;">
+      <button class="btn btn-secondary" id="btn-fit-bounds" title="Dopasuj widok mapy do wszystkich punktów">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+        Dopasuj widok
+      </button>
+
+      <!-- Menu eksportu -->
+      <div class="dropdown" id="export-dropdown">
+        <button class="btn btn-secondary" id="btn-export-trigger">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+          Eksportuj ▼
+        </button>
+        <div class="dropdown-content">
+          <button id="btn-exp-csv">Eksport CSV</button>
+          <button id="btn-exp-gpx">Eksport GPX (Trasa)</button>
+          <button id="btn-exp-geojson">Eksport GeoJSON</button>
+          <button id="btn-exp-png">Eksport PNG (Zrzut mapy)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Główny układ -->
+  <div class="app-main" id="app-container">
+    <!-- Kontener mapy -->
+    <div id="map-wrapper">
+      <div id="map"></div>
+
+      <!-- Pływająca legenda mapy -->
+      <div class="map-legend">
+        <div class="legend-title">Czas w roku (Gradient)</div>
+        <div class="legend-gradient-bar"></div>
+        <div class="legend-labels">
+          <span>Styczeń</span>
+          <span>Lipiec</span>
+          <span>Październik</span>
+        </div>
+        <div style="border-top:1px solid var(--border-color); margin: 2px 0;"></div>
+        <div class="legend-item">
+          <div class="legend-dot-single"></div>
+          <span>Pojedyncza noc</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot-cluster">5</div>
+          <span>Pobyt (np. 5 nocy z rzędu)</span>
+        </div>
+      </div>
+
+      <!-- Oś czasu i animacja roku -->
+      <div class="timeline-bar" id="timeline-bar">
+        <div class="timeline-row">
+          <div class="timeline-controls">
+            <button class="btn btn-secondary" id="btn-play" style="padding:5px 10px;" title="Odtwórz / Wstrzymaj animację z autem i przyczepą">
+              <span id="play-icon">▶</span>
+            </button>
+            <select id="playback-speed" style="font-size:0.75rem; padding:3px 6px;" title="Szybkość jazdy zestawu">
+              <option value="400">0.5x (Spokojnie)</option>
+              <option value="200" selected>1x (Standard)</option>
+              <option value="100">2x (Szybko)</option>
+              <option value="40">4x (Ekspres)</option>
+            </select>
+            <button class="btn btn-secondary" id="btn-prev-day" style="padding:4px 8px;" title="Poprzedni dzień">◀</button>
+            <button class="btn btn-secondary" id="btn-next-day" style="padding:4px 8px;" title="Następny dzień">▶</button>
+            <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.75rem; cursor:pointer; color:var(--text-main); margin-left:4px;" title="Płynnie przesuwaj mapę za jadącym samochodem">
+              <input type="checkbox" id="chk-follow-cam" checked style="width:13px; height:13px;">
+              <span class="hide-mobile">Śledź auto</span>
+            </label>
+          </div>
+
+          <div class="current-date-badge" id="timeline-date-label">----/--/--</div>
+          <div class="current-status-pill" id="timeline-status-label">Brak danych</div>
+        </div>
+
+        <input type="range" class="timeline-slider" id="timeline-slider" min="0" max="0" value="0">
+      </div>
+    </div>
+
+    <!-- Prawy panel ze statystykami, listą dób i kempingami -->
+    <div class="sidebar">
+      <div class="sidebar-tabs">
+        <button class="tab-btn active" id="tab-btn-stats" onclick="switchTab('stats')">Statystyki</button>
+        <button class="tab-btn" id="tab-btn-campsites" onclick="switchTab('campsites')">⛺ Miejscówki (<span id="campsites-count-badge">0</span>)</button>
+        <button class="tab-btn" id="tab-btn-days" onclick="switchTab('days')">Lista dób (<span id="days-count-badge">0</span>)</button>
+      </div>
+
+      <!-- Zakładka 1: Statystyki -->
+      <div id="tab-stats" class="tab-content active">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="stat-days-with-data">0</div>
+            <div class="stat-label">Doby z danymi</div>
+            <div class="stat-sub" id="stat-coverage-pct">0% zakresu</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-days-missing">0</div>
+            <div class="stat-label">Doby bez danych</div>
+            <div class="stat-sub" id="stat-future-count">0 w przeszłości</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-unique-places">0</div>
+            <div class="stat-label">Unikalne miejsca</div>
+            <div class="stat-sub">bazy noclegowe</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-total-dist">0 km</div>
+            <div class="stat-label">Łączny dystans</div>
+            <div class="stat-sub">suma skoków noc-w-noc</div>
+          </div>
+          <div class="stat-card full-width">
+            <div class="stat-label">Najdłuższy przeskok między dwiema nocami</div>
+            <div class="stat-value" id="stat-max-jump" style="font-size:1.15rem; margin-top:4px;">0 km</div>
+            <div class="stat-sub" id="stat-max-jump-desc">-</div>
+          </div>
+          <div class="stat-card full-width">
+            <div class="stat-label">Najczęstsza lokalizacja (Główna baza)</div>
+            <div class="stat-value" id="stat-top-base" style="font-size:1.15rem; margin-top:4px;">-</div>
+            <div class="stat-sub" id="stat-top-base-desc">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zakładka 2: Miejscówki / Kempingi -->
+      <div id="tab-campsites" class="tab-content">
+        <div class="campsites-toolbar">
+          <button class="btn btn-secondary" id="btn-fetch-osm-names" style="font-size:0.75rem; padding:5px 8px; flex:1;" title="Wyszukuje nazwy kempingów i miejscowości w OpenStreetMap">
+            🔍 Pobierz nazwy kempingów (OSM)
+          </button>
+          <button class="btn btn-secondary" id="btn-reset-custom-names" style="font-size:0.75rem; padding:5px 8px;" title="Resetuje własne nazwy miejscówek">
+            ↺
+          </button>
+        </div>
+        <div id="campsites-list-container">
+          <div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.85rem;">
+            Wgraj plik Timeline.json, aby zobaczyć listę miejscówek.
+          </div>
+        </div>
+      </div>
+
+      <!-- Zakładka 3: Lista dób -->
+      <div id="tab-days" class="tab-content">
+        <div class="list-filter-bar">
+          <button class="filter-btn active" id="filter-btn-all" onclick="setListFilter('all', this)">Wszystkie</button>
+          <button class="filter-btn" id="filter-btn-data" onclick="setListFilter('data', this)">Z danymi</button>
+          <button class="filter-btn" id="filter-btn-missing" onclick="setListFilter('missing', this)">Bez danych</button>
+        </div>
+        <table class="days-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Status / Pewność</th>
+              <th>Dystans</th>
+            </tr>
+          </thead>
+          <tbody id="days-table-body">
+            <tr>
+              <td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">
+                Wgraj plik Timeline.json, aby zobaczyć listę dób.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dolny pasek nawigacyjny na telefonach komórkowych -->
+  <nav class="mobile-nav-bar" id="mobile-nav-bar">
+    <button class="mobile-nav-btn active" data-view="map" onclick="setMobileView('map')">
+      <span class="mobile-nav-icon">🗺️</span>
+      <span class="mobile-nav-label">Mapa</span>
+    </button>
+    <button class="mobile-nav-btn" data-view="campsites" onclick="setMobileView('campsites')">
+      <span class="mobile-nav-icon">⛺</span>
+      <span class="mobile-nav-label">Miejscówki</span>
+      <span class="mobile-nav-badge" id="mobile-campsites-badge">0</span>
+    </button>
+    <button class="mobile-nav-btn" data-view="stats" onclick="setMobileView('stats')">
+      <span class="mobile-nav-icon">📊</span>
+      <span class="mobile-nav-label">Statystyki</span>
+    </button>
+    <button class="mobile-nav-btn" data-view="days" onclick="setMobileView('days')">
+      <span class="mobile-nav-icon">📅</span>
+      <span class="mobile-nav-label">Doby</span>
+      <span class="mobile-nav-badge" id="mobile-days-badge">0</span>
+    </button>
+  </nav>
+
+  <!-- Drag and drop nakładka -->
+  <div class="drop-overlay" id="drop-overlay">
+    <div class="drop-box">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+      <h2>Upuść pliki Timeline.json tutaj</h2>
+      <p>Obsługiwane formaty: nowy eksport z telefonu (semanticSegments), Records.json oraz pliki miesięczne z Takeout. Całość przetwarzana jest w 100% lokalnie w przeglądarce.</p>
+    </div>
+  </div>
+
+  <script>
+    /* =====================================================================
+       0. BEZPIECZNA OBSŁUGA BŁĘDÓW I STAN GLOBALNY
+       ===================================================================== */
+    // Baza nazw miejscówek i kempingów (zapisywana lokalnie w localStorage pod kluczem campmedia_places)
+    let userCustomPlaceNames = {};
+    try {
+      const saved = localStorage.getItem('campmedia_places');
+      if (saved) userCustomPlaceNames = JSON.parse(saved);
+    } catch(e) {}
+
+    function showError(msg) {
+      const banner = document.getElementById('error-banner');
+      const bannerText = document.getElementById('error-banner-text');
+      if (banner && bannerText) {
+        bannerText.innerText = msg;
+        banner.style.display = 'flex';
+      }
+    }
+
+    window.addEventListener('error', function(e) {
+      if (e.message && (e.message.includes('tile') || e.message.includes('Script error'))) {
+        return;
+      }
+      console.error('Błąd aplikacji:', e);
+    });
+
+    /* =====================================================================
+       1. UNIWERSALNE FUNKCJE PARSOWANIA DANYCH GOOGLE TIMELINE
+       ===================================================================== */
+    function parseCoords(val) {
+      if (!val) return null;
+      if (typeof val === 'object') {
+        const lat = val.latitude ?? val.lat ?? (val.latitudeE7 !== undefined ? val.latitudeE7 / 1e7 : null);
+        const lng = val.longitude ?? val.lng ?? (val.longitudeE7 !== undefined ? val.longitudeE7 / 1e7 : null);
+        if (lat !== null && lng !== null) return { lat: Number(lat), lng: Number(lng) };
+        if (val.latLng) return parseCoords(val.latLng);
+        if (val.placeLocation) return parseCoords(val.placeLocation);
+        if (val.point) return parseCoords(val.point);
+        if (val.location) return parseCoords(val.location);
+        if (val.start) return parseCoords(val.start);
+        if (val.end) return parseCoords(val.end);
+        if (val.startLocation) return parseCoords(val.startLocation);
+        if (val.endLocation) return parseCoords(val.endLocation);
+      }
+      if (typeof val === 'string') {
+        const match = val.match(/(-?\d+(?:\.\d+)?)[°\s]*,?\s*(-?\d+(?:\.\d+)?)[°\s]*/);
+        if (match) {
+          return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+        }
+      }
+      return null;
+    }
+
+    function parseTime(val) {
+      if (!val) return null;
+      if (typeof val === 'number') {
+        return val < 1e11 ? val * 1000 : val;
+      }
+      if (typeof val === 'string') {
+        const num = Number(val);
+        if (!isNaN(num) && num > 1e9) {
+          return num < 1e11 ? num * 1000 : num;
+        }
+        const parsed = Date.parse(val);
+        return isNaN(parsed) ? null : parsed;
+      }
+      return null;
+    }
+
+    async function parseJsonDataset(filesData, progressCallback) {
+      const allEvents = [];
+      const detectedFormats = [];
+      const discoveredPlaces = {};
+
+      for (let fIdx = 0; fIdx < filesData.length; fIdx++) {
+        const { name, content } = filesData[fIdx];
+        if (progressCallback) {
+          progressCallback({
+            percent: 30 + Math.round((fIdx / filesData.length) * 60),
+            message: `Parsowanie pliku ${name}...`
+          });
+          await new Promise(r => setTimeout(r, 0));
+        }
+
+        let json;
+        try {
+          json = typeof content === 'string' ? JSON.parse(content) : content;
+        } catch (err) {
+          throw new Error(`Błąd składni JSON w pliku ${name}: ${err.message}`);
+        }
+
+        let fileEvents = 0;
+
+        // FORMAT 1: Nowy eksport z telefonu (semanticSegments, rawSignals lub tablica segmentów)
+        if (json && (json.semanticSegments || Array.isArray(json) || json.rawSignals)) {
+          // Odczyt etykiet dom / praca jeśli występują w profilu użytkownika
+          if (json.userLocationProfile && Array.isArray(json.userLocationProfile.frequentPlaces)) {
+            json.userLocationProfile.frequentPlaces.forEach(fp => {
+              if (fp.label && fp.placeLocation) {
+                const c = parseCoords(fp.placeLocation);
+                if (c) {
+                  const key = `${c.lat.toFixed(3)},${c.lng.toFixed(3)}`;
+                  if (fp.label === 'HOME') discoveredPlaces[key] = '🏠 Dom';
+                  else if (fp.label === 'WORK') discoveredPlaces[key] = '💼 Praca';
+                }
+              }
+            });
+          }
+
+          const segments = json.semanticSegments || (Array.isArray(json) ? json : []);
+          let isSegmentFormat = false;
+
+          for (let i = 0; i < segments.length; i++) {
+            const seg = segments[i];
+            if (!seg) continue;
+            const start = parseTime(seg.startTime);
+            const end = parseTime(seg.endTime) || start;
+            if (!start) continue;
+
+            // Wizyta (pobyt w miejscu)
+            if (seg.visit) {
+              isSegmentFormat = true;
+              const loc = seg.visit.topCandidate?.placeLocation?.latLng || 
+                          seg.visit.placeLocation?.latLng || 
+                          seg.visit.placeLocation ||
+                          seg.visit.topCandidate?.placeLocation;
+              const coords = parseCoords(loc);
+              if (coords) {
+                allEvents.push({
+                  start, end,
+                  lat: coords.lat, lng: coords.lng,
+                  type: 'visit',
+                  name: seg.visit.topCandidate?.semanticType || 'Wizyta'
+                });
+                fileEvents++;
+              }
+            }
+            // Aktywność (ruch)
+            else if (seg.activity) {
+              isSegmentFormat = true;
+              const startCoords = parseCoords(seg.activity.start?.latLng || seg.activity.start);
+              const endCoords = parseCoords(seg.activity.end?.latLng || seg.activity.end) || startCoords;
+              if (startCoords) {
+                allEvents.push({
+                  start, end,
+                  lat: startCoords.lat, lng: startCoords.lng,
+                  endLat: endCoords ? endCoords.lat : startCoords.lat,
+                  endLng: endCoords ? endCoords.lng : startCoords.lng,
+                  type: 'activity',
+                  distance: seg.activity.distanceMeters || 0,
+                  name: seg.activity.topCandidate?.type || 'Ruch'
+                });
+                fileEvents++;
+              }
+            }
+            // timelinePath
+            if (seg.timelinePath && Array.isArray(seg.timelinePath)) {
+              isSegmentFormat = true;
+              for (let p of seg.timelinePath) {
+                const ptTime = parseTime(p.time);
+                const ptCoords = parseCoords(p.point);
+                if (ptTime && ptCoords) {
+                  allEvents.push({
+                    start: ptTime, end: ptTime,
+                    lat: ptCoords.lat, lng: ptCoords.lng,
+                    type: 'point'
+                  });
+                  fileEvents++;
+                }
+              }
+            }
+
+            if (i % 5000 === 0) {
+              await new Promise(r => setTimeout(r, 0));
+            }
+          }
+
+          if (json.rawSignals && Array.isArray(json.rawSignals)) {
+            for (let r of json.rawSignals) {
+              if (r.position) {
+                const rTime = parseTime(r.position.timestamp);
+                const rCoords = parseCoords(r.position.latLng || r.position);
+                if (rTime && rCoords) {
+                  allEvents.push({
+                    start: rTime, end: rTime,
+                    lat: rCoords.lat, lng: rCoords.lng,
+                    type: 'point'
+                  });
+                  fileEvents++;
+                  isSegmentFormat = true;
+                }
+              }
+            }
+          }
+
+          if (isSegmentFormat) {
+            detectedFormats.push(`${name}: Nowy eksport Google Timeline (semanticSegments)`);
+          }
+        }
+
+        // FORMAT 2: Stary Takeout Records.json z tablicą locations
+        if (json && (json.locations || (Array.isArray(json) && json[0]?.latitudeE7 !== undefined))) {
+          const locs = json.locations || json;
+          detectedFormats.push(`${name}: Stary Takeout (Records.json)`);
+          for (let i = 0; i < locs.length; i++) {
+            const item = locs[i];
+            if (!item) continue;
+            const lat = item.latitudeE7 !== undefined ? item.latitudeE7 / 1e7 : item.latitude;
+            const lng = item.longitudeE7 !== undefined ? item.longitudeE7 / 1e7 : item.longitude;
+            const time = parseTime(item.timestamp || item.timestampMs);
+            if (lat !== undefined && lng !== undefined && time) {
+              allEvents.push({
+                start: time, end: time,
+                lat: Number(lat), lng: Number(lng),
+                type: 'point'
+              });
+              fileEvents++;
+            }
+            if (i % 10000 === 0) {
+              await new Promise(r => setTimeout(r, 0));
+            }
+          }
+        }
+
+        // FORMAT 3: Miesięczne pliki Takeout z timelineObjects
+        if (json && json.timelineObjects && Array.isArray(json.timelineObjects)) {
+          detectedFormats.push(`${name}: Semantic Location History (timelineObjects)`);
+          for (let i = 0; i < json.timelineObjects.length; i++) {
+            const item = json.timelineObjects[i];
+            if (item.placeVisit) {
+              const pv = item.placeVisit;
+              const start = parseTime(pv.duration?.startTimestamp);
+              const end = parseTime(pv.duration?.endTimestamp) || start;
+              const lat = pv.location?.latitudeE7 !== undefined ? pv.location.latitudeE7 / 1e7 : pv.location?.latitude;
+              const lng = pv.location?.longitudeE7 !== undefined ? pv.location.longitudeE7 / 1e7 : pv.location?.longitude;
+              if (lat !== undefined && lng !== undefined && start) {
+                allEvents.push({
+                  start, end,
+                  lat: Number(lat), lng: Number(lng),
+                  type: 'visit',
+                  name: pv.location?.name || 'Wizyta'
+                });
+                fileEvents++;
+              }
+            } else if (item.activitySegment) {
+              const as = item.activitySegment;
+              const start = parseTime(as.duration?.startTimestamp);
+              const end = parseTime(as.duration?.endTimestamp) || start;
+              const sLat = as.startLocation?.latitudeE7 !== undefined ? as.startLocation.latitudeE7 / 1e7 : as.startLocation?.latitude;
+              const sLng = as.startLocation?.longitudeE7 !== undefined ? as.startLocation.longitudeE7 / 1e7 : as.startLocation?.longitude;
+              const eLat = as.endLocation?.latitudeE7 !== undefined ? as.endLocation.latitudeE7 / 1e7 : sLat;
+              const eLng = as.endLocation?.longitudeE7 !== undefined ? as.endLocation.longitudeE7 / 1e7 : sLng;
+              if (sLat !== undefined && sLng !== undefined && start) {
+                allEvents.push({
+                  start, end,
+                  lat: Number(sLat), lng: Number(sLng),
+                  endLat: Number(eLat), endLng: Number(eLng),
+                  type: 'activity',
+                  distance: as.distance || 0,
+                  name: as.activityType || 'Ruch'
+                });
+                fileEvents++;
+              }
+            }
+          }
+        }
+
+        if (fileEvents === 0 && detectedFormats.length === 0) {
+          const keys = typeof json === 'object' && json !== null ? Object.keys(json).slice(0, 8).join(', ') : 'brak kluczy';
+          throw new Error(`Nierozpoznany format pliku ${name}. Znalezione klucze na najwyższym poziomie: [${keys}]. Oczekiwano danych Google Timeline.`);
+        }
+      }
+
+      if (progressCallback) {
+        progressCallback({ percent: 95, message: 'Indeksowanie i sortowanie punktów...' });
+        await new Promise(r => setTimeout(r, 0));
+      }
+
+      allEvents.sort((a, b) => a.start - b.start);
+      return { events: allEvents, formats: detectedFormats, totalCount: allEvents.length, discoveredPlaces };
+    }
+
+    /* =====================================================================
+       2. BEZPIECZNY WORKER LUB WĄTEK GŁÓWNY
+       ===================================================================== */
+    let parserWorker = null;
+    const workerScript = `
+      ${parseCoords.toString()}
+      ${parseTime.toString()}
+      ${parseJsonDataset.toString()}
+
+      self.onmessage = async function(e) {
+        try {
+          const result = await parseJsonDataset(e.data.filesData, function(p) {
+            self.postMessage({ type: 'progress', percent: p.percent, message: p.message });
+          });
+          self.postMessage({ type: 'done', ...result });
+        } catch (err) {
+          self.postMessage({ type: 'error', message: err.message });
+        }
+      };
+    `;
+
+    try {
+      const workerBlob = new Blob([workerScript], { type: 'application/javascript' });
+      const workerUrl = URL.createObjectURL(workerBlob);
+      parserWorker = new Worker(workerUrl);
+      parserWorker.onmessage = function(e) {
+        handleParserResult(e.data);
+      };
+      parserWorker.onerror = function() {
+        parserWorker = null;
+      };
+    } catch (e) {
+      parserWorker = null;
+    }
+
+    /* =====================================================================
+       3. STAN APLIKACJI I MAPA (DARMOWE KAFELKI ESRI / OSM BEZ API KEY)
+       ===================================================================== */
+    let rawTimelineEvents = [];
+    let computedNightPoints = [];
+    let clusters = [];
+    let locationGroups = [];
+    let activeDayIndex = 0;
+    let isPlaying = false;
+    let playInterval = null;
+    let currentFilter = 'all';
+
+    let map = null;
+    let tileLayer = null;
+    let polylineLayer = null;
+    let markersLayer = null;
+    let activeHighlightMarker = null;
+
+    const TILE_SERVERS = {
+      esri_street: {
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+        options: {
+          maxZoom: 19,
+          attribution: 'Kafelki &copy; Esri &mdash; Źródło: Esri, DeLorme, NAVTEQ, USGS, TomTom'
+        }
+      },
+      esri_topo: {
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+        options: {
+          maxZoom: 19,
+          attribution: 'Kafelki &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC'
+        }
+      },
+      esri_dark: {
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+        options: {
+          maxZoom: 16,
+          attribution: 'Kafelki &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+        }
+      },
+      esri_gray: {
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+        options: {
+          maxZoom: 16,
+          attribution: 'Kafelki &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+        }
+      },
+      osm_hot: {
+        url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+        options: {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles style by Humanitarian OSM Team'
+        }
+      }
+    };
+
+    let currentTileKey = 'esri_street';
+
+    function setTileProvider(key) {
+      currentTileKey = key;
+      const def = TILE_SERVERS[key] || TILE_SERVERS.esri_street;
+      if (tileLayer) {
+        map.removeLayer(tileLayer);
+      }
+      tileLayer = L.tileLayer(def.url, {
+        ...def.options,
+        crossOrigin: true
+      }).addTo(map);
+
+      if (polylineLayer) polylineLayer.bringToFront();
+      if (markersLayer) markersLayer.bringToFront();
+    }
+
+    if (typeof L !== 'undefined') {
+      map = L.map('map', {
+        zoomControl: true,
+        attributionControl: true
+      }).setView([52.23, 21.01], 6);
+
+      const isDarkInit = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      currentTileKey = isDarkInit ? 'esri_dark' : 'esri_street';
+      document.getElementById('tile-select').value = currentTileKey;
+      setTileProvider(currentTileKey);
+
+      polylineLayer = L.polyline([], {
+        color: '#3b82f6',
+        weight: 3,
+        opacity: 0.85,
+        dashArray: '6, 6'
+      }).addTo(map);
+
+      markersLayer = L.featureGroup().addTo(map);
+
+      // Wymuszenie odświeżenia geometrii mapy Leaflet po załadowaniu
+      setTimeout(() => { if (map) map.invalidateSize(); }, 150);
+      setTimeout(() => { if (map) map.invalidateSize(); }, 600);
+
+      window.addEventListener('resize', () => {
+        if (map) map.invalidateSize();
+      });
+      window.addEventListener('orientationchange', () => {
+        setTimeout(() => { if (map) map.invalidateSize(); }, 250);
+      });
+    }
+
+    // Domyślny widok mobilny - pełna mapa
+    document.body.setAttribute('data-mobile-view', 'map');
+
+    window.setMobileView = function(view) {
+      document.body.setAttribute('data-mobile-view', view);
+      document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-view') === view);
+      });
+      if (view === 'map') {
+        if (map) {
+          setTimeout(() => map.invalidateSize(), 50);
+          setTimeout(() => map.invalidateSize(), 200);
+        }
+      } else {
+        switchTab(view);
+      }
+    };
+
+    window.toggleMobileFilters = function() {
+      const bar = document.querySelector('.controls-bar');
+      if (bar) {
+        bar.classList.toggle('show-mobile');
+      }
+    };
+
+    document.getElementById('tile-select').addEventListener('change', (e) => {
+      setTileProvider(e.target.value);
+    });
+
+    /* =====================================================================
+       4. MATEMATYKA: HAVERSINE, STREFY CZASOWE, GRADIENT KOLORÓW
+       ===================================================================== */
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function getEpochForLocalTime(year, month, day, hour, minute, timeZone) {
+      if (timeZone === 'SYSTEM') {
+        const d = new Date(year, month - 1, day, hour, minute, 0, 0);
+        return d.getTime();
+      }
+      if (timeZone === 'UTC') {
+        return Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+      }
+
+      let guess = Date.UTC(year, month - 1, day, hour, minute, 0);
+      const dtf = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: 'numeric', minute: 'numeric', second: 'numeric',
+        hourCycle: 'h23'
+      });
+
+      for (let i = 0; i < 3; i++) {
+        const parts = dtf.formatToParts(new Date(guess));
+        const p = {};
+        for (const part of parts) p[part.type] = part.value;
+        const localY = parseInt(p.year, 10);
+        const localM = parseInt(p.month, 10);
+        const localD = parseInt(p.day, 10);
+        const localH = parseInt(p.hour, 10);
+        const localMin = parseInt(p.minute, 10);
+        const localS = parseInt(p.second, 10);
+
+        const localAsUtc = Date.UTC(localY, localM - 1, localD, localH, localMin, localS);
+        const targetAsUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+        const diff = targetAsUtc - localAsUtc;
+        if (diff === 0) break;
+        guess += diff;
+      }
+      return guess;
+    }
+
+    function getColorForRatio(ratio) {
+      const hue = (1.0 - Math.max(0, Math.min(1, ratio))) * 240;
+      return `hsl(${Math.round(hue)}, 90%, 48%)`;
+    }
+
+    /* =====================================================================
+       5. GŁÓWNA LOGIKA WYZNACZANIA NOCNYCH PUNKTÓW
+       ===================================================================== */
+    function recomputeNightPoints() {
+      if (!rawTimelineEvents || rawTimelineEvents.length === 0) {
+        updateStats();
+        renderDaysTable();
+        return;
+      }
+
+      const dateStartStr = document.getElementById('date-start').value;
+      const dateEndStr = document.getElementById('date-end').value;
+      const targetTimeStr = document.getElementById('target-time').value || '01:00';
+      const toleranceMinutes = parseInt(document.getElementById('tolerance-slider').value, 10) || 60;
+      const toleranceMs = toleranceMinutes * 60 * 1000;
+      const timeZone = document.getElementById('tz-select').value;
+      const useNightContinuity = document.getElementById('chk-continuity').checked;
+
+      const [targetH, targetM] = targetTimeStr.split(':').map(Number);
+      const startD = new Date(dateStartStr + 'T00:00:00');
+      const endD = new Date(dateEndStr + 'T00:00:00');
+
+      if (isNaN(startD.getTime()) || isNaN(endD.getTime()) || startD > endD) {
+        showError('Nieprawidłowy zakres dat.');
+        return;
+      }
+
+      const results = [];
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      const totalDaysCount = Math.round((endD - startD) / oneDayMs) + 1;
+      const latestDatasetTimestamp = rawTimelineEvents[rawTimelineEvents.length - 1].end || rawTimelineEvents[rawTimelineEvents.length - 1].start;
+
+      let prevPoint = null;
+
+      for (let dayOffset = 0; dayOffset < totalDaysCount; dayOffset++) {
+        const curDateObj = new Date(startD.getTime() + dayOffset * oneDayMs);
+        const year = curDateObj.getFullYear();
+        const month = curDateObj.getMonth() + 1;
+        const day = curDateObj.getDate();
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+        const targetEpoch = getEpochForLocalTime(year, month, day, targetH, targetM, timeZone);
+        const isFuture = targetEpoch > (latestDatasetTimestamp + 14 * 3600 * 1000);
+
+        let bestMatch = null;
+
+        if (!isFuture) {
+          // KROK 1A: Potwierdzona wizyta obejmująca nocną godzinę
+          for (let i = 0; i < rawTimelineEvents.length; i++) {
+            const ev = rawTimelineEvents[i];
+            if (ev.type === 'visit' && ev.start <= targetEpoch && targetEpoch <= ev.end) {
+              bestMatch = {
+                lat: ev.lat,
+                lng: ev.lng,
+                confidence: 'W trakcie wizyty',
+                typeKey: 'visit',
+                diffMinutes: 0
+              };
+              break;
+            }
+          }
+
+          // KROK 1B: Rzeczywisty punkt pomiarowy (GPS / timelinePath) w oknie tolerancji (np. ±60 min)
+          // Zdecydowanie bardziej wiarygodny niż teoretyczna interpolacja kilkugodzinnej trasy
+          if (!bestMatch) {
+            let minDiffPt = Infinity;
+            let closestPt = null;
+            for (let i = 0; i < rawTimelineEvents.length; i++) {
+              const ev = rawTimelineEvents[i];
+              if (ev.type === 'point') {
+                const diff = Math.abs(ev.start - targetEpoch);
+                if (diff < minDiffPt && diff <= toleranceMs) {
+                  minDiffPt = diff;
+                  closestPt = ev;
+                }
+              }
+            }
+            if (closestPt) {
+              const diffMin = Math.round(minDiffPt / 60000);
+              bestMatch = {
+                lat: closestPt.lat,
+                lng: closestPt.lng,
+                confidence: diffMin === 0 ? 'Dokładny punkt o wybranej godzinie' : `Punkt na osi czasu (${diffMin} min różnicy)`,
+                typeKey: diffMin === 0 ? 'point' : 'near',
+                diffMinutes: diffMin
+              };
+            }
+          }
+
+          // KROK 1C: Przemieszczanie się w ruchu (interpolacja liniowa dla aktywności trwających do 6h)
+          if (!bestMatch) {
+            for (let i = 0; i < rawTimelineEvents.length; i++) {
+              const ev = rawTimelineEvents[i];
+              if (ev.type === 'activity' && ev.start <= targetEpoch && targetEpoch <= ev.end) {
+                const span = ev.end - ev.start;
+                // Ignorujemy kuriozalne segmenty > 6h (np. zacięcia Google trwające 24h)
+                if (span <= 6 * 3600 * 1000) {
+                  const ratio = span > 0 ? (targetEpoch - ev.start) / span : 0;
+                  const clampedRatio = Math.max(0, Math.min(1, ratio));
+                  const lat = ev.lat + clampedRatio * ((ev.endLat ?? ev.lat) - ev.lat);
+                  const lng = ev.lng + clampedRatio * ((ev.endLng ?? ev.lng) - ev.lng);
+                  bestMatch = {
+                    lat, lng,
+                    confidence: 'W trakcie przemieszczania (interpolacja)',
+                    typeKey: 'interp',
+                    diffMinutes: 0
+                  };
+                  break;
+                }
+              }
+            }
+          }
+
+          // KROK 2: Najbliższy punkt w oknie tolerancji (np. ±60 min)
+          if (!bestMatch) {
+            let minDiff = Infinity;
+            let closestEv = null;
+            let closestIsStart = true;
+
+            for (let i = 0; i < rawTimelineEvents.length; i++) {
+              const ev = rawTimelineEvents[i];
+              const diffStart = Math.abs(ev.start - targetEpoch);
+              const diffEnd = Math.abs(ev.end - targetEpoch);
+
+              if (diffStart < minDiff) {
+                minDiff = diffStart;
+                closestEv = ev;
+                closestIsStart = true;
+              }
+              if (diffEnd < minDiff) {
+                minDiff = diffEnd;
+                closestEv = ev;
+                closestIsStart = false;
+              }
+            }
+
+            if (closestEv && minDiff <= toleranceMs) {
+              const diffMin = Math.round(minDiff / 60000);
+              const lat = (closestIsStart || !closestEv.endLat) ? closestEv.lat : closestEv.endLat;
+              const lng = (closestIsStart || !closestEv.endLng) ? closestEv.lng : closestEv.endLng;
+              bestMatch = {
+                lat, lng,
+                confidence: `Najbliższy punkt (${diffMin} min różnicy)`,
+                typeKey: 'near',
+                diffMinutes: diffMin
+              };
+            }
+          }
+
+          // KROK 3: REGUŁA NOCNEJ CIĄGŁOŚCI (WIEECZÓR - RANO)
+          if (!bestMatch && useNightContinuity) {
+            let lastBefore = null;
+            let firstAfter = null;
+            const maxWindowMs = 14 * 60 * 60 * 1000;
+
+            for (let i = 0; i < rawTimelineEvents.length; i++) {
+              const ev = rawTimelineEvents[i];
+              const evTimeEnd = ev.end || ev.start;
+              const evTimeStart = ev.start;
+
+              if (evTimeEnd <= targetEpoch) {
+                if (!lastBefore || evTimeEnd > (lastBefore.end || lastBefore.start)) {
+                  if (targetEpoch - evTimeEnd <= maxWindowMs) {
+                    lastBefore = ev;
+                  }
+                }
+              }
+
+              if (evTimeStart >= targetEpoch) {
+                if (!firstAfter || evTimeStart < firstAfter.start) {
+                  if (evTimeStart - targetEpoch <= maxWindowMs) {
+                    firstAfter = ev;
+                  }
+                }
+              }
+            }
+
+            if (lastBefore && firstAfter) {
+              const lat1 = lastBefore.endLat ?? lastBefore.lat;
+              const lng1 = lastBefore.endLng ?? lastBefore.lng;
+              const lat2 = firstAfter.lat;
+              const lng2 = firstAfter.lng;
+
+              if (lat1 !== undefined && lng1 !== undefined && lat2 !== undefined && lng2 !== undefined) {
+                const d = haversineDistance(lat1, lng1, lat2, lng2);
+                if (d <= 0.25) {
+                  const diffEve = Math.round((targetEpoch - (lastBefore.end || lastBefore.start)) / 3600000 * 10) / 10;
+                  const diffMorn = Math.round(((firstAfter.start) - targetEpoch) / 3600000 * 10) / 10;
+                  bestMatch = {
+                    lat: (lat1 + lat2) / 2,
+                    lng: (lng1 + lng2) / 2,
+                    confidence: `Ciągłość nocna (to samo miejsce: -${diffEve}h wieczorem, +${diffMorn}h rano)`,
+                    typeKey: 'continuity',
+                    diffMinutes: Math.round((targetEpoch - (lastBefore.end || lastBefore.start)) / 60000)
+                  };
+                }
+              }
+            }
+          }
+        }
+
+        // Wyliczenie dystansu
+        let distFromPrev = null;
+        if (bestMatch) {
+          if (prevPoint) {
+            distFromPrev = haversineDistance(prevPoint.lat, prevPoint.lng, bestMatch.lat, bestMatch.lng);
+          }
+          prevPoint = bestMatch;
+        }
+
+        results.push({
+          date: dateStr,
+          targetEpoch,
+          hasData: !!bestMatch,
+          isFuture: isFuture,
+          lat: bestMatch ? bestMatch.lat : null,
+          lng: bestMatch ? bestMatch.lng : null,
+          confidence: bestMatch ? bestMatch.confidence : (isFuture ? 'Poza zakresem pliku (przyszłość)' : 'Brak danych'),
+          typeKey: bestMatch ? bestMatch.typeKey : (isFuture ? 'future' : 'none'),
+          diffMinutes: bestMatch ? bestMatch.diffMinutes : null,
+          distanceFromPrev: distFromPrev,
+          dayRatio: totalDaysCount > 1 ? dayOffset / (totalDaysCount - 1) : 0
+        });
+      }
+
+      computedNightPoints = results;
+      clusters = buildNightClusters(results);
+      locationGroups = buildLocationGroups(clusters);
+
+      renderMapVisuals();
+      updateTimelineSlider();
+      updateStats();
+      renderDaysTable();
+      renderCampsitesList();
+    }
+
+    function buildNightClusters(points) {
+      const radiusSlider = document.getElementById('cluster-radius-slider');
+      const clusterRadiusKm = (radiusSlider ? parseFloat(radiusSlider.value) : 350) / 1000;
+      const clusterList = [];
+      let currentCluster = null;
+
+      for (let i = 0; i < points.length; i++) {
+        const pt = points[i];
+        if (!pt.hasData) continue;
+
+        if (!currentCluster) {
+          currentCluster = {
+            startDate: pt.date,
+            endDate: pt.date,
+            points: [pt],
+            lat: pt.lat,
+            lng: pt.lng,
+            firstIndex: i
+          };
+        } else {
+          // Porównanie z uśrednioną pozycją klastra (środkiem ciężkości)
+          const d = haversineDistance(currentCluster.lat, currentCluster.lng, pt.lat, pt.lng);
+          if (d <= clusterRadiusKm) {
+            currentCluster.endDate = pt.date;
+            currentCluster.points.push(pt);
+            // Dynamiczne wyznaczanie środka ciężkości klastra
+            const count = currentCluster.points.length;
+            currentCluster.lat = currentCluster.points.reduce((acc, p) => acc + p.lat, 0) / count;
+            currentCluster.lng = currentCluster.points.reduce((acc, p) => acc + p.lng, 0) / count;
+          } else {
+            clusterList.push(currentCluster);
+            currentCluster = {
+              startDate: pt.date,
+              endDate: pt.date,
+              points: [pt],
+              lat: pt.lat,
+              lng: pt.lng,
+              firstIndex: i
+            };
+          }
+        }
+      }
+      if (currentCluster) clusterList.push(currentCluster);
+      return clusterList;
+    }
+
+    // Grupuje pobyty wg unikalnej lokalizacji geograficznej (powroty do tego samego miejsca w roku)
+    function buildLocationGroups(clusterList) {
+      const groups = [];
+      clusterList.forEach((cl) => {
+        let found = null;
+        for (const g of groups) {
+          const d = haversineDistance(g.lat, g.lng, cl.lat, cl.lng);
+          if (d <= 0.1) { // 100 m
+            found = g;
+            break;
+          }
+        }
+        if (!found) {
+          found = { lat: cl.lat, lng: cl.lng, clusters: [] };
+          groups.push(found);
+        }
+        found.clusters.push(cl);
+      });
+      return groups;
+    }
+
+    // Globalna funkcja nawigacji do pobytu z dymka popup
+    window.jumpToDay = function(dayIndex) {
+      setActiveDay(dayIndex);
+      const pt = computedNightPoints[dayIndex];
+      if (pt && pt.hasData && map) {
+        map.panTo([pt.lat, pt.lng]);
+      }
+    };
+
+    /* =====================================================================
+       6. WIDOK MAPY
+       ===================================================================== */
+    function renderMapVisuals() {
+      if (!map || !markersLayer) return;
+      markersLayer.clearLayers();
+      const polylineCoords = [];
+
+      computedNightPoints.forEach(pt => {
+        if (pt.hasData) {
+          polylineCoords.push([pt.lat, pt.lng]);
+        }
+      });
+      polylineLayer.setLatLngs(polylineCoords);
+
+      locationGroups.forEach((grp) => {
+        const N = grp.clusters.length;
+        grp.clusters.forEach((cl, k) => {
+          const nightCount = cl.points.length;
+          const color = getColorForRatio(cl.points[0].dayRatio);
+
+          let iconHtml;
+          let size;
+          if (nightCount > 1) {
+            size = 28 + Math.min(16, nightCount);
+            iconHtml = `<div class="custom-cluster-icon" style="background:${color}; width:${size}px; height:${size}px; font-size:12px;">${nightCount}</div>`;
+          } else {
+            size = 18;
+            iconHtml = `<div class="custom-cluster-icon" style="background:${color}; width:${size}px; height:${size}px; font-size:9px;">•</div>`;
+          }
+
+          // Jeśli w tym samym miejscu były wielokrotne pobyty w roku (np. lipiec i sierpień),
+          // rozsuwamy je mikro-offsetem w pikselach, aby wcześniejsze pobyty nie były zasłonięte!
+          let anchorX = size / 2;
+          let anchorY = size / 2;
+          if (N > 1) {
+            const angle = (2 * Math.PI * k / N) - (Math.PI / 2);
+            const offsetRadius = 16 + Math.min(10, N * 2);
+            const offsetX = Math.round(offsetRadius * Math.cos(angle));
+            const offsetY = Math.round(offsetRadius * Math.sin(angle));
+            anchorX = size / 2 - offsetX;
+            anchorY = size / 2 - offsetY;
+          }
+
+          const customIcon = L.divIcon({
+            className: 'cluster-icon-wrapper',
+            html: iconHtml,
+            iconSize: [size, size],
+            iconAnchor: [anchorX, anchorY]
+          });
+
+          const marker = L.marker([cl.lat, cl.lng], { icon: customIcon });
+
+          const dateRangeDesc = nightCount > 1 ? `${cl.startDate} do ${cl.endDate}` : cl.startDate;
+
+          let multiStayHtml = '';
+          if (N > 1) {
+            const listHtml = grp.clusters.map((c, idx) => {
+              const isCurrent = (c === cl);
+              const cDesc = c.points.length > 1 ? `${c.startDate} – ${c.endDate} (${c.points.length} nocy)` : `${c.startDate} (1 noc)`;
+              const cColor = getColorForRatio(c.points[0].dayRatio);
+              return `
+                <div style="margin-top:5px; padding:4px 7px; border-radius:5px; background:${isCurrent ? 'rgba(37,99,235,0.15)' : 'rgba(100,116,139,0.1)'}; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                  <span style="display:flex; align-items:center; gap:6px;">
+                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${cColor}; border:1px solid #fff; flex-shrink:0;"></span>
+                    <span ${isCurrent ? 'style="font-weight:700; color:var(--primary);"' : ''}>Pobyt ${idx + 1}: ${cDesc}</span>
+                  </span>
+                  ${!isCurrent ? `<button onclick="window.jumpToDay(${c.firstIndex})" style="font-size:0.75rem; border:none; background:var(--primary); color:#fff; border-radius:3px; padding:2px 7px; cursor:pointer;">Pokaż</button>` : '<span style="font-size:0.75rem; color:var(--primary); font-weight:700;">Wybrany</span>'}
+                </div>
+              `;
+            }).join('');
+
+            const totalNightsInLoc = grp.clusters.reduce((sum, c) => sum + c.points.length, 0);
+            multiStayHtml = `
+              <div style="margin-top:8px; padding-top:6px; border-top:1px dashed var(--border-color, #cbd5e1);">
+                <div style="font-weight:700; color:var(--primary); font-size:0.85rem; margin-bottom:2px;">
+                  📍 Powracające miejsce: ${N} pobyty (${totalNightsInLoc} nocy łącznie w roku)
+                </div>
+                ${listHtml}
+              </div>
+            `;
+          }
+
+          const placeKey = `${cl.lat.toFixed(3)},${cl.lng.toFixed(3)}`;
+          const placeName = userCustomPlaceNames[placeKey] || `Miejscówka [${cl.lat.toFixed(3)}, ${cl.lng.toFixed(3)}]`;
+
+          const popupContent = `
+            <div style="font-size:0.85rem; line-height:1.4; min-width:240px;">
+              <div style="font-weight:700; color:var(--primary); font-size:0.95rem; display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                <span>⛺ ${placeName}</span>
+                <button onclick="window.editPlaceName('${placeKey}')" title="Zmień nazwę miejscówki" style="border:none; background:transparent; cursor:pointer; font-size:0.8rem;">✏️</button>
+              </div>
+              <div style="font-weight:600; margin-top:2px;">${nightCount > 1 ? `Pobyt: ${nightCount} nocy` : '1 noc'}</div>
+              <b>Data:</b> ${dateRangeDesc}<br>
+              <b>Współrzędne:</b> ${cl.lat.toFixed(5)}, ${cl.lng.toFixed(5)}<br>
+              <b>Pewność:</b> ${cl.points[0].confidence}
+              ${multiStayHtml}
+            </div>
+          `;
+          marker.bindPopup(popupContent);
+          marker.on('click', () => {
+            setActiveDay(cl.firstIndex);
+          });
+
+          markersLayer.addLayer(marker);
+        });
+      });
+
+      updateActiveHighlight();
+    }
+
+    let caravanMarker = null;
+    let currentCaravanAngle = 0;
+    let animationFrameId = null;
+    let isDriving = false;
+
+    function calculateBearing(lat1, lon1, lat2, lon2) {
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δλ = (lon2 - lon1) * Math.PI / 180;
+      const y = Math.sin(Δλ) * Math.cos(φ2);
+      const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+      const θ = Math.atan2(y, x);
+      return (θ * 180 / Math.PI + 360) % 360;
+    }
+
+    function createCaravanIcon(rotationDeg = 0, labelText = '') {
+      return L.divIcon({
+        className: 'caravan-div-icon',
+        html: `
+          <div class="caravan-vehicle-container">
+            ${labelText ? `<div class="caravan-popup-pill">${labelText}</div>` : ''}
+            <div class="caravan-sprite" style="transform: rotate(${rotationDeg}deg);">
+              <svg width="68" height="28" viewBox="0 0 68 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Przyczepa kempingowa (z tyłu) -->
+                <path d="M 4 8 Q 4 5 7 5 L 26 5 Q 29 5 29 8 L 29 19 Q 29 21 26 21 L 6 21 Q 4 21 4 18 Z" fill="#ffffff" stroke="#1e293b" stroke-width="1.5" />
+                <path d="M 4 14 L 29 14" stroke="#3b82f6" stroke-width="2" />
+                <rect x="8" y="7" width="9" height="5" rx="1" fill="#93c5fd" stroke="#1e293b" stroke-width="1" />
+                <rect x="20" y="8" width="6" height="12" rx="1" fill="#f1f5f9" stroke="#1e293b" stroke-width="0.8" />
+                <circle cx="16" cy="21" r="3.5" fill="#334155" stroke="#f8fafc" stroke-width="1" />
+                <circle cx="16" cy="21" r="1.5" fill="#cbd5e1" />
+                <!-- Hak holowniczy -->
+                <path d="M 29 18 L 36 18" stroke="#475569" stroke-width="2.5" stroke-linecap="round" />
+                <!-- Samochód SUV (z przodu) -->
+                <path d="M 36 12 L 40 8 Q 42 7 45 7 L 53 7 Q 56 7 58 11 L 63 12 Q 65 13 65 16 L 65 19 Q 65 21 62 21 L 37 21 Q 36 21 36 19 Z" fill="#2563eb" stroke="#0f172a" stroke-width="1.5" />
+                <path d="M 44 9 L 52 9 L 55 12 L 43 12 Z" fill="#bfdbfe" stroke="#0f172a" stroke-width="0.8" />
+                <path d="M 56 12 L 59 12 L 61 14 L 56 14 Z" fill="#93c5fd" />
+                <circle cx="64" cy="15" r="1.2" fill="#fef08a" />
+                <circle cx="43" cy="21" r="3.5" fill="#1e293b" stroke="#f8fafc" stroke-width="1" />
+                <circle cx="43" cy="21" r="1.5" fill="#cbd5e1" />
+                <circle cx="58" cy="21" r="3.5" fill="#1e293b" stroke="#f8fafc" stroke-width="1" />
+                <circle cx="58" cy="21" r="1.5" fill="#cbd5e1" />
+              </svg>
+            </div>
+          </div>
+        `,
+        iconSize: [68, 28],
+        iconAnchor: [34, 14]
+      });
+    }
+
+    function updateActiveHighlight() {
+      if (!map) return;
+      if (isDriving) return;
+
+      if (!computedNightPoints || computedNightPoints.length === 0) {
+        if (caravanMarker) {
+          map.removeLayer(caravanMarker);
+          caravanMarker = null;
+        }
+        return;
+      }
+
+      const pt = computedNightPoints[activeDayIndex];
+      if (pt && pt.hasData) {
+        const placeKey = `${pt.lat.toFixed(3)},${pt.lng.toFixed(3)}`;
+        const customName = userCustomPlaceNames[placeKey];
+        const pillText = customName ? `⛺ ${customName}` : `📅 ${pt.date}`;
+
+        if (!caravanMarker) {
+          caravanMarker = L.marker([pt.lat, pt.lng], {
+            icon: createCaravanIcon(currentCaravanAngle, pillText),
+            zIndexOffset: 3000
+          }).addTo(map);
+        } else {
+          caravanMarker.setLatLng([pt.lat, pt.lng]);
+          caravanMarker.setIcon(createCaravanIcon(currentCaravanAngle, pillText));
+        }
+      }
+    }
+
+    function fitBoundsToPoints() {
+      if (!map) return;
+      map.invalidateSize();
+      const validPoints = computedNightPoints.filter(p => p.hasData);
+      if (validPoints.length === 0) {
+        showError('Brak punktów do dopasowania widoku w wybranym zakresie.');
+        return;
+      }
+      const bounds = L.latLngBounds(validPoints.map(p => [p.lat, p.lng]));
+      const pad = window.innerWidth <= 768 ? [20, 20] : [50, 50];
+      map.fitBounds(bounds, { padding: pad });
+    }
+
+    /* =====================================================================
+       7. OŚ CZASU I ANIMACJA
+       ===================================================================== */
+    function updateTimelineSlider() {
+      const slider = document.getElementById('timeline-slider');
+      slider.max = Math.max(0, computedNightPoints.length - 1);
+      slider.value = activeDayIndex;
+      updateTimelineLabels();
+    }
+
+    function updateTimelineLabels() {
+      if (!computedNightPoints || computedNightPoints.length === 0) {
+        document.getElementById('timeline-date-label').innerText = '----/--/--';
+        document.getElementById('timeline-status-label').innerText = 'Brak danych';
+        return;
+      }
+
+      const pt = computedNightPoints[activeDayIndex];
+      if (!pt) return;
+
+      document.getElementById('timeline-date-label').innerText = pt.date;
+      if (pt.hasData) {
+        const distStr = pt.distanceFromPrev !== null ? ` | Skok: ${pt.distanceFromPrev.toFixed(1)} km` : '';
+        document.getElementById('timeline-status-label').innerText = `${pt.confidence}${distStr}`;
+      } else {
+        document.getElementById('timeline-status-label').innerText = pt.confidence || 'Brak danych dla tej doby';
+      }
+
+      updateActiveHighlight();
+      highlightTableRow(activeDayIndex);
+    }
+
+    function setActiveDay(index, centerMap = false) {
+      if (!computedNightPoints || computedNightPoints.length === 0) return;
+      activeDayIndex = Math.max(0, Math.min(computedNightPoints.length - 1, index));
+      document.getElementById('timeline-slider').value = activeDayIndex;
+      updateTimelineLabels();
+
+      const pt = computedNightPoints[activeDayIndex];
+      if (centerMap && pt && pt.hasData && map) {
+        map.panTo([pt.lat, pt.lng], { animate: true, duration: 0.5 });
+      }
+    }
+
+    document.getElementById('btn-play').addEventListener('click', () => {
+      if (isPlaying) {
+        pausePlayback();
+      } else {
+        startPlayback();
+      }
+    });
+
+    function startPlayback() {
+      if (!computedNightPoints || computedNightPoints.length === 0) return;
+      isPlaying = true;
+      document.getElementById('play-icon').innerText = '⏸';
+      runAnimationLoop();
+    }
+
+    async function runAnimationLoop() {
+      while (isPlaying) {
+        let nextIndex = activeDayIndex + 1;
+        while (nextIndex < computedNightPoints.length && !computedNightPoints[nextIndex].hasData) {
+          nextIndex++;
+        }
+
+        if (nextIndex >= computedNightPoints.length) {
+          // Koniec trasy - powrót na początek
+          activeDayIndex = 0;
+          while (activeDayIndex < computedNightPoints.length && !computedNightPoints[activeDayIndex].hasData) {
+            activeDayIndex++;
+          }
+          setActiveDay(activeDayIndex, false);
+          await new Promise(r => setTimeout(r, 600));
+        } else {
+          const curPt = computedNightPoints[activeDayIndex];
+          const nxtPt = computedNightPoints[nextIndex];
+
+          if (curPt && curPt.hasData && nxtPt && nxtPt.hasData) {
+            const dist = haversineDistance(curPt.lat, curPt.lng, nxtPt.lat, nxtPt.lng);
+            const speedVal = parseInt(document.getElementById('playback-speed').value, 10) || 200;
+
+            if (dist > 0.4) {
+              const durationMs = Math.max(350, Math.min(2200, speedVal * 5.5));
+              await driveBetweenPoints(curPt, nxtPt, durationMs);
+            } else {
+              const pauseMs = Math.max(200, speedVal * 1.5);
+              await new Promise(r => setTimeout(r, pauseMs));
+            }
+          }
+          setActiveDay(nextIndex, false);
+        }
+
+        if (!isPlaying) break;
+      }
+    }
+
+    function driveBetweenPoints(startPt, endPt, durationMs) {
+      return new Promise(resolve => {
+        isDriving = true;
+        const bearing = calculateBearing(startPt.lat, startPt.lng, endPt.lat, endPt.lng);
+        currentCaravanAngle = bearing - 90;
+
+        const startTime = performance.now();
+        const followCam = document.getElementById('chk-follow-cam') ? document.getElementById('chk-follow-cam').checked : true;
+
+        const placeKey = `${endPt.lat.toFixed(3)},${endPt.lng.toFixed(3)}`;
+        const customName = userCustomPlaceNames[placeKey];
+        const pillText = customName ? `⛺ ${customName}` : `➡️ ${endPt.date}`;
+
+        function step(now) {
+          if (!isPlaying) {
+            isDriving = false;
+            resolve();
+            return;
+          }
+
+          const elapsed = now - startTime;
+          const rawProgress = Math.min(1, elapsed / durationMs);
+          const t = rawProgress < 0.5 ? 2 * rawProgress * rawProgress : 1 - Math.pow(-2 * rawProgress + 2, 2) / 2;
+
+          const lat = startPt.lat + (endPt.lat - startPt.lat) * t;
+          const lng = startPt.lng + (endPt.lng - startPt.lng) * t;
+
+          if (caravanMarker) {
+            caravanMarker.setLatLng([lat, lng]);
+            caravanMarker.setIcon(createCaravanIcon(currentCaravanAngle, pillText));
+          }
+
+          if (followCam && map) {
+            map.panTo([lat, lng], { animate: false });
+          }
+
+          if (rawProgress < 1) {
+            animationFrameId = requestAnimationFrame(step);
+          } else {
+            isDriving = false;
+            resolve();
+          }
+        }
+
+        animationFrameId = requestAnimationFrame(step);
+      });
+    }
+
+    function pausePlayback() {
+      isPlaying = false;
+      isDriving = false;
+      document.getElementById('play-icon').innerText = '▶';
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      updateActiveHighlight();
+    }
+
+    document.getElementById('timeline-slider').addEventListener('input', (e) => {
+      setActiveDay(parseInt(e.target.value, 10));
+    });
+
+    document.getElementById('btn-prev-day').addEventListener('click', () => {
+      setActiveDay(activeDayIndex - 1, true);
+    });
+
+    document.getElementById('btn-next-day').addEventListener('click', () => {
+      setActiveDay(activeDayIndex + 1, true);
+    });
+
+    document.getElementById('playback-speed').addEventListener('change', () => {
+      if (isPlaying) {
+        pausePlayback();
+        startPlayback();
+      }
+    });
+
+    /* =====================================================================
+       8. STATYSTYKI I TABELA BOCZNA
+       ===================================================================== */
+    function updateStats() {
+      const total = computedNightPoints.length;
+      const withData = computedNightPoints.filter(p => p.hasData);
+      const withoutData = computedNightPoints.filter(p => !p.hasData && !p.isFuture);
+      const futureCount = computedNightPoints.filter(p => p.isFuture).length;
+      const pastTotal = withData.length + withoutData.length;
+
+      document.getElementById('stat-days-with-data').innerText = withData.length;
+      document.getElementById('stat-coverage-pct').innerText = pastTotal > 0 ? `${((withData.length / pastTotal) * 100).toFixed(1)}% z minionych dni` : '0%';
+      document.getElementById('stat-days-missing').innerText = withoutData.length;
+      document.getElementById('stat-future-count').innerText = futureCount > 0 ? `+ ${futureCount} dób w przyszłości` : '0 w przeszłości';
+      document.getElementById('stat-unique-places').innerText = locationGroups.length;
+
+      let totalDistance = 0;
+      let maxJump = 0;
+      let maxJumpDetails = '-';
+
+      for (let i = 0; i < computedNightPoints.length; i++) {
+        const pt = computedNightPoints[i];
+        if (pt.hasData && pt.distanceFromPrev !== null) {
+          totalDistance += pt.distanceFromPrev;
+          if (pt.distanceFromPrev > maxJump) {
+            maxJump = pt.distanceFromPrev;
+            maxJumpDetails = `${pt.distanceFromPrev.toFixed(1)} km w nocy ${pt.date}`;
+          }
+        }
+      }
+
+      document.getElementById('stat-total-dist').innerText = `${totalDistance.toFixed(0)} km`;
+      document.getElementById('stat-max-jump').innerText = maxJump > 0 ? `${maxJump.toFixed(1)} km` : '0 km';
+      document.getElementById('stat-max-jump-desc').innerText = maxJumpDetails;
+
+      let topLocation = null;
+      let topLocNights = 0;
+      locationGroups.forEach(grp => {
+        const totalNights = grp.clusters.reduce((sum, c) => sum + c.points.length, 0);
+        if (totalNights > topLocNights) {
+          topLocNights = totalNights;
+          topLocation = grp;
+        }
+      });
+
+      if (topLocation) {
+        const stayCount = topLocation.clusters.length;
+        const stayDesc = stayCount > 1 ? ` (${stayCount} pobyty w roku)` : '';
+        document.getElementById('stat-top-base').innerText = `${topLocNights} nocy${stayDesc}`;
+        document.getElementById('stat-top-base-desc').innerText = `Okolice: ${topLocation.lat.toFixed(4)}, ${topLocation.lng.toFixed(4)}`;
+      } else {
+        document.getElementById('stat-top-base').innerText = '-';
+        document.getElementById('stat-top-base-desc').innerText = 'Brak danych do wyznaczenia';
+      }
+
+      document.getElementById('days-count-badge').innerText = total;
+      const mobDaysBadge = document.getElementById('mobile-days-badge');
+      if (mobDaysBadge) mobDaysBadge.innerText = total;
+    }
+
+    function renderDaysTable() {
+      const tbody = document.getElementById('days-table-body');
+      tbody.innerHTML = '';
+
+      if (!computedNightPoints || computedNightPoints.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">Brak danych. Wgraj plik Timeline.json.</td></tr>';
+        return;
+      }
+
+      const filtered = computedNightPoints.map((pt, idx) => ({ pt, originalIndex: idx })).filter(item => {
+        if (currentFilter === 'data') return item.pt.hasData;
+        if (currentFilter === 'missing') return !item.pt.hasData;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">Brak dób spełniających filtr.</td></tr>';
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+
+      filtered.forEach(({ pt, originalIndex }) => {
+        const tr = document.createElement('tr');
+        tr.id = `day-row-${originalIndex}`;
+        if (originalIndex === activeDayIndex) tr.classList.add('active-row');
+
+        tr.addEventListener('click', () => {
+          if (window.innerWidth <= 768) {
+            setMobileView('map');
+          }
+          setActiveDay(originalIndex, true);
+          if (map) {
+            setTimeout(() => map.invalidateSize(), 80);
+          }
+        });
+
+        const badgeClass = `badge badge-${pt.typeKey}`;
+        const distText = pt.distanceFromPrev !== null ? `${pt.distanceFromPrev.toFixed(1)} km` : '-';
+
+        tr.innerHTML = `
+          <td><strong>${pt.date}</strong></td>
+          <td><span class="${badgeClass}">${pt.confidence}</span></td>
+          <td>${distText}</td>
+        `;
+        fragment.appendChild(tr);
+      });
+
+      tbody.appendChild(fragment);
+    }
+
+    function highlightTableRow(index) {
+      document.querySelectorAll('.days-table tr.active-row').forEach(el => el.classList.remove('active-row'));
+      const row = document.getElementById(`day-row-${index}`);
+      if (row) {
+        row.classList.add('active-row');
+        row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+
+    function setListFilter(filter, el) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+      if (el) el.classList.add('active');
+      renderDaysTable();
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+      if (tabName === 'stats') {
+        document.getElementById('tab-btn-stats').classList.add('active');
+        document.getElementById('tab-stats').classList.add('active');
+      } else if (tabName === 'campsites') {
+        document.getElementById('tab-btn-campsites').classList.add('active');
+        document.getElementById('tab-campsites').classList.add('active');
+        renderCampsitesList();
+      } else {
+        document.getElementById('tab-btn-days').classList.add('active');
+        document.getElementById('tab-days').classList.add('active');
+      }
+
+      // Synchronizacja paska mobilnego
+      document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-view') === tabName);
+      });
+      if (window.innerWidth <= 768 && tabName !== 'map') {
+        document.body.setAttribute('data-mobile-view', tabName);
+      }
+    }
+
+    /* =====================================================================
+       8B. LISTA MIEJSCOWEK / KEMPINGÓW I GEOLOKALIZACJA OSM
+       ===================================================================== */
+    function renderCampsitesList() {
+      const container = document.getElementById('campsites-list-container');
+      if (!container) return;
+
+      const badge = document.getElementById('campsites-count-badge');
+      if (badge) badge.innerText = locationGroups.length;
+      const mobBadge = document.getElementById('mobile-campsites-badge');
+      if (mobBadge) mobBadge.innerText = locationGroups.length;
+
+      if (!locationGroups || locationGroups.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.85rem;">Brak zarejestrowanych miejscówek w wybranym zakresie.</div>';
+        return;
+      }
+
+      // Sortuj wg łącznej liczby nocy malejąco
+      const sorted = [...locationGroups].sort((a, b) => {
+        const sumA = a.clusters.reduce((s, c) => s + c.points.length, 0);
+        const sumB = b.clusters.reduce((s, c) => s + c.points.length, 0);
+        return sumB - sumA;
+      });
+
+      const fragment = document.createDocumentFragment();
+
+      sorted.forEach((grp, idx) => {
+        const totalNights = grp.clusters.reduce((s, c) => s + c.points.length, 0);
+        const stayCount = grp.clusters.length;
+        const placeKey = `${grp.lat.toFixed(3)},${grp.lng.toFixed(3)}`;
+        const customName = userCustomPlaceNames[placeKey];
+        const displayName = customName || `Miejscówka #${idx + 1}`;
+        const isDefault = !customName;
+
+        const card = document.createElement('div');
+        card.className = 'campsite-card';
+        card.id = `campsite-card-${placeKey.replace(',', '_')}`;
+
+        // Daty pobytów
+        const staysDesc = grp.clusters.map(c => {
+          return c.points.length > 1 ? `${c.startDate} – ${c.endDate} (${c.points.length} nocy)` : `${c.startDate} (1 noc)`;
+        }).join('<br>• ');
+
+        card.innerHTML = `
+          <div class="campsite-header">
+            <div class="campsite-title">
+              <span>⛺</span>
+              <span id="title-${placeKey.replace(',', '_')}" style="${isDefault ? 'color:var(--text-muted); font-weight:600;' : 'color:var(--text-main); font-weight:700;'}">${displayName}</span>
+              <button class="btn-edit-name" onclick="event.stopPropagation(); window.editPlaceName('${placeKey}')" title="Edytuj nazwę kempingu">✏️</button>
+            </div>
+            <span class="campsite-badge">${totalNights} ${totalNights === 1 ? 'noc' : (totalNights < 5 ? 'noce' : 'nocy')}</span>
+          </div>
+          <div class="campsite-sub" style="margin-top:2px;">
+            <span>📍 ${grp.lat.toFixed(4)}, ${grp.lng.toFixed(4)}</span>
+            <span>${stayCount > 1 ? `${stayCount} pobyty w roku` : '1 pobyt'}</span>
+          </div>
+          <div style="font-size:0.75rem; color:var(--text-muted); line-height:1.4; margin-top:4px; padding-top:4px; border-top:1px dashed var(--border-color);">
+            • ${staysDesc}
+          </div>
+        `;
+
+        card.addEventListener('click', () => {
+          document.querySelectorAll('.campsite-card').forEach(c => c.classList.remove('active-card'));
+          card.classList.add('active-card');
+          if (window.innerWidth <= 768) {
+            setMobileView('map');
+          }
+          if (map) {
+            map.flyTo([grp.lat, grp.lng], Math.max(map.getZoom(), 14), { duration: 0.8 });
+            setTimeout(() => map.invalidateSize(), 80);
+          }
+          if (grp.clusters[0]) {
+            setActiveDay(grp.clusters[0].firstIndex, false);
+          }
+        });
+
+        fragment.appendChild(card);
+      });
+
+      container.innerHTML = '';
+      container.appendChild(fragment);
+    }
+
+    // Edycja własnej nazwy kempingu / bazy
+    window.editPlaceName = function(placeKey) {
+      const current = userCustomPlaceNames[placeKey] || '';
+      const [lat, lng] = placeKey.split(',').map(Number);
+      const newName = prompt(`Wprowadź nazwę kempingu / bazy noclegowej dla współrzędnych [${lat.toFixed(4)}, ${lng.toFixed(4)}]:`, current);
+      if (newName !== null) {
+        const trimmed = newName.trim();
+        if (trimmed) {
+          userCustomPlaceNames[placeKey] = trimmed;
+        } else {
+          delete userCustomPlaceNames[placeKey];
+        }
+        try {
+          localStorage.setItem('campmedia_places', JSON.stringify(userCustomPlaceNames));
+        } catch(e) {}
+        renderCampsitesList();
+        renderMapVisuals();
+      }
+    };
+
+    // Automatyczne dociąganie nazw z OpenStreetMap (Nominatim / Overpass)
+    async function fetchOsmNamesForLocations() {
+      if (!locationGroups || locationGroups.length === 0) return showError('Brak miejscówek do pobrania nazw.');
+      const btn = document.getElementById('btn-fetch-osm-names');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Pobieranie nazw z OSM...';
+      }
+
+      let fetchedCount = 0;
+      for (let i = 0; i < locationGroups.length; i++) {
+        const grp = locationGroups[i];
+        const placeKey = `${grp.lat.toFixed(3)},${grp.lng.toFixed(3)}`;
+        // Jeśli użytkownik już wpisał własną nazwę, nie nadpisujemy jej automatycznie
+        if (userCustomPlaceNames[placeKey] && !userCustomPlaceNames[placeKey].startsWith('Miejscówka')) {
+          continue;
+        }
+
+        try {
+          if (btn) btn.innerText = `Pobieranie ${i + 1}/${locationGroups.length}...`;
+          const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${grp.lat}&lon=${grp.lng}&zoom=18&addressdetails=1`;
+          const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+          if (res.ok) {
+            const data = await res.json();
+            let discoveredName = '';
+            
+            // 1. Sprawdź czy Nominatim zwrócił konkretną nazwę obiektu (np. kemping, resort)
+            if (data.name && typeof data.name === 'string') {
+              discoveredName = data.name;
+            } else if (data.address) {
+              const a = data.address;
+              const place = a.camp_site || a.caravan_site || a.tourism || a.hotel || a.suburb || a.village || a.town || a.city || a.municipality;
+              const city = a.city || a.town || a.municipality || a.county || '';
+              if (place && city && place !== city) {
+                discoveredName = `${place} (${city})`;
+              } else if (place) {
+                discoveredName = place;
+              } else if (city) {
+                discoveredName = `Okolice: ${city}`;
+              }
+            }
+
+            if (discoveredName) {
+              userCustomPlaceNames[placeKey] = discoveredName;
+              fetchedCount++;
+            }
+          }
+        } catch (err) {
+          console.warn('Błąd pobierania nazwy z OSM dla:', placeKey, err);
+        }
+
+        // Pauza 1.1s aby przestrzegać zasad użytkowania Nominatim API (1 req/s)
+        await new Promise(r => setTimeout(r, 1100));
+      }
+
+      try {
+        localStorage.setItem('campmedia_places', JSON.stringify(userCustomPlaceNames));
+      } catch(e) {}
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = '🔍 Pobierz nazwy kempingów (OSM)';
+      }
+      renderCampsitesList();
+      renderMapVisuals();
+    }
+
+    document.getElementById('btn-fetch-osm-names').addEventListener('click', fetchOsmNamesForLocations);
+
+    document.getElementById('btn-reset-custom-names').addEventListener('click', () => {
+      if (confirm('Czy na pewno chcesz zresetować wszystkie zapisane nazwy kempingów?')) {
+        userCustomPlaceNames = {};
+        try { localStorage.removeItem('campmedia_places'); } catch(e) {}
+        renderCampsitesList();
+        renderMapVisuals();
+      }
+    });
+
+    /* =====================================================================
+       9. EKSPORTY: CSV, GPX, GEOJSON I ZRZUT PNG
+       ===================================================================== */
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function exportCSV() {
+      if (!computedNightPoints || computedNightPoints.length === 0) return showError('Brak danych do eksportu.');
+      let csv = '\uFEFFData,Godzina,Szerokosc_Geo,Dlugosc_Geo,Pewnosc,Dystans_Od_Poprzedniej_Nocy_km\r\n';
+      computedNightPoints.forEach(p => {
+        csv += `"${p.date}","${document.getElementById('target-time').value}","${p.lat ?? ''}","${p.lng ?? ''}","${p.confidence}","${p.distanceFromPrev ? p.distanceFromPrev.toFixed(2) : ''}"\r\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      downloadBlob(blob, 'nocne_punkty.csv');
+    }
+
+    function exportGPX() {
+      const valid = computedNightPoints.filter(p => p.hasData);
+      if (valid.length === 0) return showError('Brak punktów do eksportu GPX.');
+
+      let gpx = '<?xml version="1.0" encoding="UTF-8"?>\r\n';
+      gpx += '<gpx version="1.1" creator="Google Timeline Nocne Punkty" xmlns="http://www.topografix.com/GPX/1/1">\r\n';
+      gpx += '  <trk>\r\n    <name>Trasa nocnych punktów</name>\r\n    <trkseg>\r\n';
+
+      valid.forEach(p => {
+        const isoTime = new Date(p.targetEpoch).toISOString();
+        gpx += `      <trkpt lat="${p.lat}" lon="${p.lng}">\r\n`;
+        gpx += `        <time>${isoTime}</time>\r\n`;
+        gpx += `        <name>${p.date}</name>\r\n`;
+        gpx += `        <desc>${p.confidence}</desc>\r\n`;
+        gpx += `      </trkpt>\r\n`;
+      });
+
+      gpx += '    </trkseg>\r\n  </trk>\r\n</gpx>';
+      const blob = new Blob([gpx], { type: 'application/gpx+xml;charset=utf-8;' });
+      downloadBlob(blob, 'trasa_nocnych_punktow.gpx');
+    }
+
+    function exportGeoJSON() {
+      const valid = computedNightPoints.filter(p => p.hasData);
+      if (valid.length === 0) return showError('Brak punktów do eksportu GeoJSON.');
+
+      const features = valid.map(p => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [p.lng, p.lat]
+        },
+        properties: {
+          date: p.date,
+          confidence: p.confidence,
+          distanceFromPrevKm: p.distanceFromPrev
+        }
+      }));
+
+      features.push({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: valid.map(p => [p.lng, p.lat])
+        },
+        properties: {
+          name: 'Trasa chronologiczna'
+        }
+      });
+
+      const geojson = {
+        type: 'FeatureCollection',
+        features
+      };
+
+      const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/geo+json;charset=utf-8;' });
+      downloadBlob(blob, 'nocne_punkty.geojson');
+    }
+
+    function exportPNG() {
+      const mapEl = document.getElementById('map');
+      if (!mapEl || typeof html2canvas === 'undefined') return showError('Brak biblioteki do zrzutu ekranu.');
+
+      const btn = document.getElementById('btn-exp-png');
+      const originalText = btn.innerText;
+      btn.innerText = 'Generowanie PNG...';
+
+      html2canvas(mapEl, {
+        useCORS: true,
+        allowTaint: false,
+        logging: false
+      }).then(canvas => {
+        canvas.toBlob(blob => {
+          if (blob) downloadBlob(blob, 'mapa_nocnych_punktow.png');
+          btn.innerText = originalText;
+        });
+      }).catch(err => {
+        console.error(err);
+        showError('Nie udało się wygenerować zrzutu ekranu mapy: ' + err.message);
+        btn.innerText = originalText;
+      });
+    }
+
+    document.getElementById('btn-export-trigger').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('export-dropdown').classList.toggle('show');
+    });
+
+    document.getElementById('btn-exp-csv').addEventListener('click', exportCSV);
+    document.getElementById('btn-exp-gpx').addEventListener('click', exportGPX);
+    document.getElementById('btn-exp-geojson').addEventListener('click', exportGeoJSON);
+    document.getElementById('btn-exp-png').addEventListener('click', exportPNG);
+
+    window.addEventListener('click', () => {
+      document.getElementById('export-dropdown').classList.remove('show');
+    });
+
+    /* =====================================================================
+       10. WCZYTYWANIE PLIKÓW I OBSŁUGA POSTĘPU
+       ===================================================================== */
+    const fileInput = document.getElementById('file-input');
+    const dropOverlay = document.getElementById('drop-overlay');
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const progressPercent = document.getElementById('progress-percent');
+
+    function updateProgress(percent, text) {
+      progressBar.style.width = percent + '%';
+      progressPercent.innerText = percent + '%';
+      progressText.innerText = text;
+    }
+
+    function handleParserResult(data) {
+      if (data.type === 'progress') {
+        updateProgress(data.percent, data.message);
+      } else if (data.type === 'done') {
+        updateProgress(100, 'Zakończono pomyślnie!');
+        setTimeout(() => {
+          progressContainer.style.display = 'none';
+        }, 500);
+
+        rawTimelineEvents = data.events;
+
+        if (data.discoveredPlaces && typeof data.discoveredPlaces === 'object') {
+          Object.keys(data.discoveredPlaces).forEach(k => {
+            if (!userCustomPlaceNames[k]) {
+              userCustomPlaceNames[k] = data.discoveredPlaces[k];
+            }
+          });
+        }
+
+        if (rawTimelineEvents.length > 0) {
+          const firstDate = new Date(rawTimelineEvents[0].start);
+          const lastDate = new Date(rawTimelineEvents[rawTimelineEvents.length - 1].end || rawTimelineEvents[rawTimelineEvents.length - 1].start);
+          const startYear = firstDate.getFullYear();
+          const endYear = lastDate.getFullYear();
+
+          const curStart = document.getElementById('date-start').value;
+          const curEnd = document.getElementById('date-end').value;
+
+          // Automatycznie przycinamy datę końcową do ostatniego dnia w pliku
+          const lastYMD = `${lastDate.getFullYear()}-${String(lastDate.getMonth() + 1).padStart(2, '0')}-${String(lastDate.getDate()).padStart(2, '0')}`;
+          if (curEnd > lastYMD) {
+            document.getElementById('date-end').value = lastYMD;
+          }
+          if (curStart.startsWith('2026') && startYear !== 2026 && endYear !== 2026) {
+            document.getElementById('date-start').value = `${endYear}-01-01`;
+          }
+        }
+
+        recomputeNightPoints();
+        fitBoundsToPoints();
+        if (window.innerWidth <= 768) {
+          setMobileView('map');
+        }
+      } else if (data.type === 'error') {
+        progressContainer.style.display = 'none';
+        showError(data.message);
+      }
+    }
+
+    async function handleFiles(files) {
+      if (!files || files.length === 0) return;
+
+      document.getElementById('error-banner').style.display = 'none';
+      progressContainer.style.display = 'block';
+      updateProgress(5, `Wczytywanie ${files.length} pliku(ów)...`);
+
+      try {
+        const filesData = [];
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const sizeMb = (file.size / 1024 / 1024).toFixed(1);
+          updateProgress(5 + Math.round((i / files.length) * 20), `Odczyt ${file.name} (${sizeMb} MB)...`);
+          const text = await file.text();
+          filesData.push({ name: file.name, content: text });
+          await new Promise(r => setTimeout(r, 0));
+        }
+
+        if (parserWorker) {
+          updateProgress(30, 'Przetwarzanie w Web Workerze...');
+          parserWorker.postMessage({ filesData });
+        } else {
+          updateProgress(30, 'Przetwarzanie danych w przeglądarce...');
+          const result = await parseJsonDataset(filesData, function(p) {
+            updateProgress(p.percent, p.message);
+          });
+          handleParserResult({ type: 'done', ...result });
+        }
+      } catch (err) {
+        progressContainer.style.display = 'none';
+        showError('Błąd wczytywania: ' + err.message);
+      } finally {
+        fileInput.value = '';
+      }
+    }
+
+    fileInput.addEventListener('change', (e) => {
+      handleFiles(e.target.files);
+    });
+
+    window.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropOverlay.style.display = 'flex';
+    });
+
+    dropOverlay.addEventListener('dragleave', (e) => {
+      if (e.target === dropOverlay) {
+        dropOverlay.style.display = 'none';
+      }
+    });
+
+    dropOverlay.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropOverlay.style.display = 'none';
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFiles(e.dataTransfer.files);
+      }
+    });
+
+    /* =====================================================================
+       11. REAKTYWNOŚĆ NA ZMIANĘ PARAMETRÓW I MOTYW
+       ===================================================================== */
+    document.getElementById('date-start').addEventListener('change', recomputeNightPoints);
+    document.getElementById('date-end').addEventListener('change', recomputeNightPoints);
+    document.getElementById('target-time').addEventListener('change', recomputeNightPoints);
+    document.getElementById('tz-select').addEventListener('change', recomputeNightPoints);
+    document.getElementById('chk-continuity').addEventListener('change', recomputeNightPoints);
+    document.getElementById('btn-fit-bounds').addEventListener('click', fitBoundsToPoints);
+
+    document.getElementById('tolerance-slider').addEventListener('input', (e) => {
+      document.getElementById('tolerance-val').innerText = e.target.value;
+      recomputeNightPoints();
+    });
+
+    document.getElementById('cluster-radius-slider').addEventListener('input', (e) => {
+      document.getElementById('cluster-radius-val').innerText = e.target.value;
+      recomputeNightPoints();
+    });
+
+    const themeBtn = document.getElementById('theme-toggle');
+    let currentTheme = 'auto';
+
+    function applyTheme(theme) {
+      let isDark = false;
+      if (theme === 'auto') {
+        document.documentElement.removeAttribute('data-theme');
+        themeBtn.innerText = '🌓';
+        isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      } else if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        themeBtn.innerText = '🌙';
+        isDark = true;
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        themeBtn.innerText = '☀️';
+        isDark = false;
+      }
+
+      if (currentTileKey === 'esri_street' || currentTileKey === 'esri_dark') {
+        const targetTile = isDark ? 'esri_dark' : 'esri_street';
+        document.getElementById('tile-select').value = targetTile;
+        setTileProvider(targetTile);
+      }
+    }
+
+    themeBtn.addEventListener('click', () => {
+      if (currentTheme === 'auto') currentTheme = 'dark';
+      else if (currentTheme === 'dark') currentTheme = 'light';
+      else currentTheme = 'auto';
+      applyTheme(currentTheme);
+    });
+    applyTheme(currentTheme);
+
+    /* =====================================================================
+       12. ZARZĄDZANIE MODALAMI (INSTRUKCJA I CAMP MEDIA)
+       ===================================================================== */
+    function openModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'flex';
+    }
+
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    }
+
+    // Zamknięcie po kliknięciu w tło za kartą modala
+    document.querySelectorAll('.app-modal-backdrop').forEach(backdrop => {
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) {
+          backdrop.style.display = 'none';
+        }
+      });
+    });
+
+    document.getElementById('btn-open-guide').addEventListener('click', () => openModal('modal-guide'));
+    document.getElementById('btn-open-about').addEventListener('click', () => openModal('modal-welcome'));
+
+    // Automatyczne powitanie przy pierwszym uruchomieniu
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        openModal('modal-welcome');
+      }, 400);
+    });
+
+    try {
+      const sysTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (sysTz && sysTz !== 'Europe/Warsaw') {
+        const tzSelect = document.getElementById('tz-select');
+        const opt = document.createElement('option');
+        opt.value = sysTz;
+        opt.innerText = `${sysTz} (Wykryta strefa)`;
+        tzSelect.insertBefore(opt, tzSelect.firstChild);
+      }
+    } catch (e) {
+      // Ignoruj błąd
+    }
+  </script>
+</body>
+</html>
+
